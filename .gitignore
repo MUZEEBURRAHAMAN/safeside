@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+.env
+.env.*
+*.xcuserstate
+xcuserdata/
+DerivedData/
+.build/
+ios/FoodScanner.xcodeproj/
+__pycache__/
+.supabase/
+supabase/.temp/
