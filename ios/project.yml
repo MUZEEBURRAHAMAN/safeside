@@ -1,0 +1,104 @@
+# XcodeGen spec — generates FoodScanner.xcodeproj (gitignored; never commit it).
+# Usage: `cd ios && xcodegen generate`, then open FoodScanner.xcodeproj.
+# See ios/README.md for full setup steps (Config.xcconfig, SPM packages, team).
+
+name: FoodScanner
+
+options:
+  bundleIdPrefix: io.omnisai
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  # Keeps both real-device (iphoneos) and Simulator (iphonesimulator) builds
+  # available — the default SUPPORTED_PLATFORMS; not restricted to either.
+
+# Project-level base configuration. Config.xcconfig defines SUPABASE_URL /
+# SUPABASE_ANON_KEY, injected into Info.plist below via $(VAR) substitution.
+# Config.xcconfig is gitignored (see ios/README.md); Config-example.xcconfig
+# is the tracked template.
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1,2" # iPhone + iPad
+    CODE_SIGN_STYLE: Automatic
+    # TODO(you): set your Apple Developer Team ID before building on a device
+    # or archiving — either here (e.g. "ABCDE12345") or as DEVELOPMENT_TEAM in
+    # Config.xcconfig. Simulator builds work with this left empty.
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.0.0"
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios
+    from: "5.0.0"
+
+targets:
+  FoodScanner:
+    type: application
+    platform: iOS
+    sources:
+      - path: FoodScanner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.omnisai.foodscanner
+        PRODUCT_NAME: FoodScanner
+    info:
+      path: Generated/FoodScanner-Info.plist
+      properties:
+        CFBundleDisplayName: FoodScanner
+        NSCameraUsageDescription: "Scan product barcodes and labels to look up ingredients."
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        ITSAppUsesNonExemptEncryption: false
+        # Injected from Config.xcconfig at build time — never hardcode secrets here.
+        SUPABASE_URL: "$(SUPABASE_URL)"
+        SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
+    dependencies:
+      - package: Supabase
+        product: Supabase
+      - package: RevenueCat
+        product: RevenueCat
+
+  FoodScannerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: FoodScannerTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.omnisai.foodscanner.tests
+    dependencies:
+      - target: FoodScanner
+
+  FoodScannerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: FoodScannerUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.omnisai.foodscanner.uitests
+    dependencies:
+      - target: FoodScanner
+
+schemes:
+  FoodScanner:
+    build:
+      targets:
+        FoodScanner: all
+        FoodScannerTests: [test]
+        FoodScannerUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FoodScannerTests
+        - FoodScannerUITests

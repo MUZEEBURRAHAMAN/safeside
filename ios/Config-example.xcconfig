@@ -1,0 +1,16 @@
+// Template for ios/Config.xcconfig (which is gitignored — never commit real
+// keys). Copy this file to Config.xcconfig and fill in your Supabase project's
+// values. The anon key is publishable-tier (safe to ship in a binary), but we
+// still keep it out of the repo since it's project-specific.
+//
+// IMPORTANT — xcconfig files treat `//` as a comment, which breaks plain URLs.
+// Escape the double slash with an empty macro `$()` as shown below, or the
+// rest of the line (and the URL) will be silently dropped.
+//
+// After editing, run: cd ios && xcodegen generate
+
+SUPABASE_URL = https:/$()/YOUR-PROJECT-REF.supabase.co
+SUPABASE_ANON_KEY = REPLACE_ME_WITH_YOUR_SUPABASE_ANON_KEY
+
+// Optional: set your Apple Developer Team ID here instead of in project.yml.
+// DEVELOPMENT_TEAM = ABCDE12345

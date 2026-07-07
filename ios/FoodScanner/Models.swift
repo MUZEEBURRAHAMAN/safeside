@@ -3,7 +3,7 @@ import Foundation
 /// Core models — mirror docs/DATA_MODEL.md. All nutrition numbers come from the
 /// backend (computed from the DB), never from an LLM.
 
-enum ScoreBand: String, Codable {
+enum ScoreBand: String, Codable, Equatable {
     case high, mid, low, unknown
 
     var label: String {
@@ -12,6 +12,19 @@ enum ScoreBand: String, Codable {
         case .mid:  return "Moderately processed"
         case .low:  return "Higher-processed"
         case .unknown: return "Not enough data"
+        }
+    }
+
+    /// Mirrors the bands in docs/SCORING_METHODOLOGY.md (75–100 / 45–74 / 0–44).
+    /// The backend is the source of truth for `band` on a real `ScoreResult` —
+    /// this exists for previews/tests/defensive fallback, never to recompute
+    /// scores on-device (the LLM/client never does the math).
+    static func from(score: Int) -> ScoreBand {
+        switch score {
+        case 75...100: return .high
+        case 45..<75:  return .mid
+        case 0..<45:   return .low
+        default:       return .unknown
         }
     }
 }
