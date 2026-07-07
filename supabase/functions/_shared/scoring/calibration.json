@@ -1,0 +1,1028 @@
+[
+  {
+    "id": 1,
+    "product": "Extra-virgin olive oil",
+    "category": "Oil",
+    "input": {
+      "nova": 1,
+      "nutriscore": "c",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 83.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": "Whole-food fat; Nutri-Score dings fat, processing pristine"
+  },
+  {
+    "id": 2,
+    "product": "Fresh banana",
+    "category": "Fruit",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": "Baseline whole food"
+  },
+  {
+    "id": 3,
+    "product": "Raw almonds",
+    "category": "Nuts",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 4,
+    "product": "Rolled oats (plain)",
+    "category": "Grain",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 5,
+    "product": "White rice",
+    "category": "Grain",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 6,
+    "product": "Frozen peas (plain)",
+    "category": "Vegetable",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 7,
+    "product": "Whole milk",
+    "category": "Dairy",
+    "input": {
+      "nova": 1,
+      "nutriscore": "b",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 90.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 8,
+    "product": "Plain Greek yogurt",
+    "category": "Dairy",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 9,
+    "product": "Sparkling water (plain)",
+    "category": "Beverage",
+    "input": {
+      "nova": 1,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 97.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": "CONTRAST to diet soda \u2192 should score high"
+  },
+  {
+    "id": 10,
+    "product": "Honey (pure)",
+    "category": "Sweetener",
+    "input": {
+      "nova": 1,
+      "nutriscore": "d",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 76.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": "Whole but high sugar"
+  },
+  {
+    "id": 11,
+    "product": "Pure maple syrup",
+    "category": "Sweetener",
+    "input": {
+      "nova": 1,
+      "nutriscore": "d",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 76.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 12,
+    "product": "Natural peanut butter (peanuts only)",
+    "category": "Spread",
+    "input": {
+      "nova": 2,
+      "nutriscore": "c",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 80.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 73.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 13,
+    "product": "Butter",
+    "category": "Dairy fat",
+    "input": {
+      "nova": 3,
+      "nutriscore": "d",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 53.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": "Sat fat dings nutrition"
+  },
+  {
+    "id": 14,
+    "product": "Cheddar cheese",
+    "category": "Dairy",
+    "input": {
+      "nova": 3,
+      "nutriscore": "d",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 53.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": "EDGE: nutrient-dense; compare vs sugary cereal"
+  },
+  {
+    "id": 15,
+    "product": "Canned chickpeas",
+    "category": "Legume",
+    "input": {
+      "nova": 3,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 74.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 16,
+    "product": "Hummus",
+    "category": "Spread",
+    "input": {
+      "nova": 3,
+      "nutriscore": "b",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 67.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 17,
+    "product": "Tofu",
+    "category": "Protein",
+    "input": {
+      "nova": 3,
+      "nutriscore": "b",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 67.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 18,
+    "product": "Sourdough bread (artisan)",
+    "category": "Bakery",
+    "input": {
+      "nova": 3,
+      "nutriscore": "c",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 60.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 19,
+    "product": "Salted roasted peanuts",
+    "category": "Nuts",
+    "input": {
+      "nova": 3,
+      "nutriscore": "b",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 67.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 20,
+    "product": "Dark chocolate 85%",
+    "category": "Confectionery",
+    "input": {
+      "nova": 3,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 53.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 21,
+    "product": "Potato chips (plain salted)",
+    "category": "Snack",
+    "input": {
+      "nova": 3,
+      "nutriscore": "d",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 53.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 22,
+    "product": "Ketchup",
+    "category": "Condiment",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 36.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 23,
+    "product": "Mustard",
+    "category": "Condiment",
+    "input": {
+      "nova": 3,
+      "nutriscore": "b",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 67.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 24,
+    "product": "Kombucha",
+    "category": "Beverage",
+    "input": {
+      "nova": 3,
+      "nutriscore": "b",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 67.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 25,
+    "product": "100% orange juice",
+    "category": "Beverage",
+    "input": {
+      "nova": 1,
+      "nutriscore": "c",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 100.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 83.0,
+      "band": "high",
+      "bandLabel": "Lower-processed"
+    },
+    "notes": "Whole but sugar-heavy"
+  },
+  {
+    "id": 26,
+    "product": "Oat milk (fortified)",
+    "category": "Beverage",
+    "input": {
+      "nova": 4,
+      "nutriscore": "b",
+      "additiveTiers": [
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 50.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 27,
+    "product": "Diet cola (sweeteners)",
+    "category": "Beverage",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "moderate",
+        "moderate",
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 88.0,
+      "score": 41.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "EDGE: OK nutrition but NOVA4 + additives \u2192 should score LOW (anti-Yuka)"
+  },
+  {
+    "id": 28,
+    "product": "Regular cola",
+    "category": "Beverage",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 100.0,
+      "score": 29.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 29,
+    "product": "Energy drink",
+    "category": "Beverage",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "moderate",
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 91.0,
+      "score": 28.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 30,
+    "product": "Sports drink",
+    "category": "Beverage",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 94.0,
+      "score": 35.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 31,
+    "product": "Multigrain Cheerios (fortified)",
+    "category": "Cereal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "b",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 70.0,
+      "additives": 100.0,
+      "score": 50.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": "EDGE: compare vs Froot Loops"
+  },
+  {
+    "id": 32,
+    "product": "Froot Loops (sugary cereal)",
+    "category": "Cereal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "higher",
+        "moderate",
+        "moderate"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 76.0,
+      "score": 26.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "Colours + BHT"
+  },
+  {
+    "id": 33,
+    "product": "Granola (sweetened)",
+    "category": "Cereal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 43.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 34,
+    "product": "Instant ramen noodles",
+    "category": "Meal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "moderate",
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 91.0,
+      "score": 28.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 35,
+    "product": "Canned condensed soup",
+    "category": "Meal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 94.0,
+      "score": 35.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 36,
+    "product": "Frozen pizza",
+    "category": "Meal",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "moderate",
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 94.0,
+      "score": 35.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 37,
+    "product": "Milk chocolate bar",
+    "category": "Confectionery",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 100.0,
+      "score": 29.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "Emulsifier = low concern"
+  },
+  {
+    "id": 38,
+    "product": "Flavoured fruit yogurt",
+    "category": "Dairy",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "low",
+        "moderate"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 94.0,
+      "score": 42.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 39,
+    "product": "Protein bar",
+    "category": "Snack",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 94.0,
+      "score": 42.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 40,
+    "product": "Doritos (flavoured chips)",
+    "category": "Snack",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "moderate",
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 91.0,
+      "score": 34.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "MSG + colours"
+  },
+  {
+    "id": 41,
+    "product": "Refined crackers",
+    "category": "Snack",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 43.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 42,
+    "product": "White sandwich bread (industrial)",
+    "category": "Bakery",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 43.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 43,
+    "product": "Ice cream",
+    "category": "Dessert",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 100.0,
+      "score": 36.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 44,
+    "product": "Deli ham (cured)",
+    "category": "Meat",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "higher",
+        "moderate"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 79.0,
+      "score": 32.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "EDGE: nitrite=higher concern but floor(30) prevents tanking"
+  },
+  {
+    "id": 45,
+    "product": "Bacon",
+    "category": "Meat",
+    "input": {
+      "nova": 4,
+      "nutriscore": "e",
+      "additiveTiers": [
+        "higher"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 12.0,
+      "additives": 85.0,
+      "score": 27.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": "nitrite"
+  },
+  {
+    "id": 46,
+    "product": "Chicken sausages",
+    "category": "Meat",
+    "input": {
+      "nova": 4,
+      "nutriscore": "d",
+      "additiveTiers": [
+        "moderate",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 30.0,
+      "additives": 94.0,
+      "score": 35.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 47,
+    "product": "Peanut butter w/ sugar + palm oil",
+    "category": "Spread",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 43.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 48,
+    "product": "Baby food fruit puree",
+    "category": "Baby",
+    "input": {
+      "nova": 3,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 74.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 49,
+    "product": "Margarine spread",
+    "category": "Dairy fat",
+    "input": {
+      "nova": 4,
+      "nutriscore": "c",
+      "additiveTiers": [
+        "low",
+        "low"
+      ]
+    },
+    "expected": {
+      "processing": 20.0,
+      "nutrition": 50.0,
+      "additives": 100.0,
+      "score": 43.0,
+      "band": "low",
+      "bandLabel": "Higher-processed"
+    },
+    "notes": null
+  },
+  {
+    "id": 50,
+    "product": "Canned tuna in water",
+    "category": "Protein",
+    "input": {
+      "nova": 3,
+      "nutriscore": "a",
+      "additiveTiers": []
+    },
+    "expected": {
+      "processing": 55.0,
+      "nutrition": 90.0,
+      "additives": 100.0,
+      "score": 74.0,
+      "band": "mid",
+      "bandLabel": "Moderately processed"
+    },
+    "notes": null
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "composite": {
+    "processing": 0.5,
+    "nutrition": 0.35,
+    "additives": 0.15
+  },
+  "novaToProcessing": {
+    "1": 100.0,
+    "2": 80.0,
+    "3": 55.0,
+    "4": 20.0
+  },
+  "nutriToNutrition": {
+    "a": 90.0,
+    "b": 70.0,
+    "c": 50.0,
+    "d": 30.0,
+    "e": 12.0
+  },
+  "additivePenalties": {
+    "low": {
+      "first": 0,
+      "additional": 0
+    },
+    "moderate": {
+      "first": 6,
+      "additional": 3
+    },
+    "higher": {
+      "first": 15,
+      "additional": 8
+    }
+  },
+  "additiveFloor": 30.0
+}
