@@ -4,6 +4,15 @@
 
 ## Decisions log
 
+### 2026-07 · Build started: repo, fixtures, scoring rule locked, parallel tracks
+- **Git repo initialized** (was folder-only). `.gitignore` excludes secrets (`.env*`), Xcode user state, generated `.xcodeproj` (regenerated via XcodeGen).
+- **Calibration extracted to fixtures:** `tools/extract_calibration.py` (stdlib-only) parses `docs/Scoring_Calibration.xlsx` → `supabase/functions/_shared/scoring/{weights,calibration}.json`. Verified the formula reproduces **all 50 expected scores exactly**.
+- **Scoring rounding rule locked:** final score uses **half-up rounding** (96.5→97), matching Excel `ROUND`. Python's banker's rounding gives off-by-one on *.5 values — don't use it. Additive penalties count first/additional **per tier** (e.g. higher+moderate = −15−6 = 79).
+- **Scoring-engine test conflict resolved (founder OK'd):** KICKOFF said Swift Testing for the engine, but BACKEND_SPEC puts the engine server-side (TypeScript/Deno Edge Function). Decision: **engine tests in Deno** against the calibration fixtures; Swift Testing covers client model decoding + band mapping.
+- **Xcode project via XcodeGen** (`ios/project.yml`) instead of a committed binary `.xcodeproj` — reviewable in git, regenerable. Xcode itself not yet installed on this Mac (founder installing); all non-Xcode work proceeds in parallel.
+- Tooling installed via brew: deno 2.9.1, supabase CLI 2.109.1, xcodegen 2.45.4.
+- Unknown additives (not in our curated risk table) score as **low tier but labeled "unknown"** in the breakdown — we never invent risk (spec §5 governance).
+
 ### 2026-06 · Apple HIG made an explicit principle
 - Made "native-first, brand-skinned (Apple HIG)" a first-class design principle (`DESIGN_SYSTEM.md` §1 #5) with a concrete defer-vs-override table (§11.1) and a `DESIGN.md` foundation note. Previously HIG alignment was present but implicit (SF Pro, SF Symbols, Dynamic Type, VoiceOver, native SwiftUI components). Rule: defer to Apple for behavior/navigation/gestures/accessibility; brand overrides color/type/Score Badge/spacing; on conflict, HIG wins behavior, brand wins visuals.
 

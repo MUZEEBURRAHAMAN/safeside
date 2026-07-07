@@ -35,7 +35,7 @@ Pre-build / Phase 0 (foundation & setup). No code yet. Research, UX, design syst
 ## Where things live
 - `DESIGN.md` — UI direction summary · `docs/DESIGN_SYSTEM.md` — full tokens/components + brand kit
 - `MEMORY.md` — decisions log
-- `docs/` — brief, product requirements, design decisions, and specs (scoring, data model, API, AI planner, copy deck, metrics, test plan) · `docs/NATIVE_IOS_STACK.md` — the decided native iOS stack
+- `docs/` — brief, product requirements, design decisions, and specs (scoring, data model, backend, data sources/APIs, ingredient-AI, API, copy deck, metrics, test plan) · `docs/NATIVE_IOS_STACK.md` — the decided native iOS stack · `docs/DATA_SOURCES.md` — open APIs (OFF, USDA, Open*Facts family)
 - `reference/research/` — market + UX research · `reference/build/` — build & phase plans
 - `reference/competitors/`, `reference/flows/`, `reference/screenshots/`, `reference/moodboards/` — supporting notes & visual references
 - `.claude/agents/` — specialist agents (ux-researcher, ux-product-designer, ui-designer, app-ui-designer, ios-app-developer); see its README
