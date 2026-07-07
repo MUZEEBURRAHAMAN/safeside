@@ -1,0 +1,532 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "lastReviewed": "2026-07",
+    "governance": "Curated additive risk table per SCORING_METHODOLOGY.md §5. Tiers reflect RISK (real-world dietary exposure vs regulatory intake limits), not theoretical hazard. Every entry cites a named regulatory review (EFSA, FDA, JECFA, IARC) — never blogs or single cherry-picked studies. Keys match Open Food Facts additives_tags format (en:eXXX). Changes to this table increment the score_version; log changes in MEMORY.md. Additives not present in this table are scored as low tier and flagged as 'not yet reviewed' in the score detail — absence of review is never treated as evidence of concern.",
+    "tiers": {
+      "low": "Broadly recognized as safe at typical intakes; no penalty.",
+      "moderate": "Regulatory intake caution exists (ADI set, some groups may approach it, or labeling requirements apply).",
+      "higher": "Restricted or withdrawn in at least one major jurisdiction, or under active regulatory re-review with unresolved concerns."
+    }
+  },
+  "en:e100": {
+    "eNumber": "E100",
+    "name": "Curcumin",
+    "tier": "low",
+    "reason": "Natural turmeric color; EFSA set an ADI and typical dietary exposure stays within it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of curcumin (E100), 2010", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1679" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e101": {
+    "eNumber": "E101",
+    "name": "Riboflavin (vitamin B2)",
+    "tier": "low",
+    "reason": "A B vitamin used as a yellow color; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of riboflavins (E101), 2013", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/3357" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e102": {
+    "eNumber": "E102",
+    "name": "Tartrazine",
+    "tier": "moderate",
+    "reason": "Azo color with an EFSA ADI; foods containing it in the EU must carry a note about possible effects on activity and attention in children.",
+    "sources": [
+      { "name": "EFSA re-evaluation of tartrazine (E102), 2009", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1331" },
+      { "name": "EU Regulation 1333/2008 Annex V (labelling of certain colours)", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32008R1333" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e104": {
+    "eNumber": "E104",
+    "name": "Quinoline yellow",
+    "tier": "moderate",
+    "reason": "EFSA lowered its ADI in 2009 and EU labelling rules for certain colors apply; not authorized for food in the US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of quinoline yellow (E104), 2009", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1329" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e110": {
+    "eNumber": "E110",
+    "name": "Sunset yellow FCF",
+    "tier": "moderate",
+    "reason": "Azo color; EFSA revised its ADI in 2014 and EU child-activity labelling rules apply.",
+    "sources": [
+      { "name": "EFSA refined exposure assessment of sunset yellow (E110), 2014", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/3765" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e120": {
+    "eNumber": "E120",
+    "name": "Cochineal / carminic acid (carmine)",
+    "tier": "moderate",
+    "reason": "EFSA maintained the ADI in 2015; rare hypersensitivity reactions are documented, so people with known sensitivity may want to check for it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of cochineal, carminic acid, carmines (E120), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4288" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e122": {
+    "eNumber": "E122",
+    "name": "Azorubine / carmoisine",
+    "tier": "moderate",
+    "reason": "Azo color with an EFSA ADI; EU child-activity labelling rules apply and it is not authorized in the US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of azorubine/carmoisine (E122), 2009", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1332" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e124": {
+    "eNumber": "E124",
+    "name": "Ponceau 4R",
+    "tier": "moderate",
+    "reason": "EFSA lowered its ADI in 2009; EU child-activity labelling rules apply and it is not authorized in the US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of Ponceau 4R (E124), 2009", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1328" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e127": {
+    "eNumber": "E127",
+    "name": "Erythrosine (Red 3)",
+    "tier": "higher",
+    "reason": "The US FDA revoked its authorization for foods in January 2025 based on findings in laboratory animals; it remains permitted in limited uses elsewhere.",
+    "sources": [
+      { "name": "FDA order revoking authorization of FD&C Red No. 3, 2025", "url": "https://www.fda.gov/food/hfp-constituent-updates/fda-revoke-authorization-use-red-no-3-food-and-ingested-drugs" },
+      { "name": "EFSA re-evaluation of erythrosine (E127), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1854" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e129": {
+    "eNumber": "E129",
+    "name": "Allura red AC",
+    "tier": "moderate",
+    "reason": "Azo color with an EFSA ADI; EU child-activity labelling rules apply.",
+    "sources": [
+      { "name": "EFSA re-evaluation of Allura Red AC (E129), 2009", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1327" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e133": {
+    "eNumber": "E133",
+    "name": "Brilliant blue FCF",
+    "tier": "low",
+    "reason": "EFSA set an ADI and estimated dietary exposure stays below it for all population groups.",
+    "sources": [
+      { "name": "EFSA re-evaluation of Brilliant Blue FCF (E133), 2010", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1853" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e150d": {
+    "eNumber": "E150d",
+    "name": "Sulphite ammonia caramel",
+    "tier": "moderate",
+    "reason": "EFSA set a group ADI for caramel colors; the 4-MEI byproduct is monitored and intake by high consumers can approach the ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of caramel colours (E150a-d), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2004" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e160a": {
+    "eNumber": "E160a",
+    "name": "Carotenes",
+    "tier": "low",
+    "reason": "Plant-derived orange pigments (provitamin A); EFSA found reported food uses of mixed carotenes to be of no safety concern.",
+    "sources": [
+      { "name": "EFSA re-evaluation of mixed carotenes (E160a), 2012", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2593" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e160b": {
+    "eNumber": "E160b",
+    "name": "Annatto extracts",
+    "tier": "low",
+    "reason": "Seed-derived color; EFSA set updated ADIs in 2016 and exposure estimates stay within them.",
+    "sources": [
+      { "name": "EFSA safety assessment of annatto extracts (E160b), 2016", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4544" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e160c": {
+    "eNumber": "E160c",
+    "name": "Paprika extract",
+    "tier": "low",
+    "reason": "Pepper-derived color; EFSA found no safety concern at reported use levels.",
+    "sources": [
+      { "name": "EFSA re-evaluation of paprika extract (E160c), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4320" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e170": {
+    "eNumber": "E170",
+    "name": "Calcium carbonate",
+    "tier": "low",
+    "reason": "A mineral (chalk) also used as a calcium source; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of calcium carbonate (E170), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2318" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e171": {
+    "eNumber": "E171",
+    "name": "Titanium dioxide",
+    "tier": "higher",
+    "reason": "EFSA concluded in 2021 that genotoxicity could not be ruled out and the EU withdrew its food authorization in 2022; it remains permitted in some other jurisdictions, including the US.",
+    "sources": [
+      { "name": "EFSA safety assessment of titanium dioxide (E171), 2021", "url": "https://www.efsa.europa.eu/en/news/titanium-dioxide-e171-no-longer-considered-safe-when-used-food-additive" },
+      { "name": "EU Regulation 2022/63 (removal of E171 from authorized additives)", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R0063" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e202": {
+    "eNumber": "E202",
+    "name": "Potassium sorbate",
+    "tier": "low",
+    "reason": "Common preservative; EFSA set a revised group ADI in 2019 and typical exposure stays within it.",
+    "sources": [
+      { "name": "EFSA revised group ADI for sorbic acid and potassium sorbate (E200, E202), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5625" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e211": {
+    "eNumber": "E211",
+    "name": "Sodium benzoate",
+    "tier": "moderate",
+    "reason": "Preservative with an EFSA group ADI; intake by children who consume many soft drinks can approach the ADI, and benzene can form in some drinks that also contain vitamin C.",
+    "sources": [
+      { "name": "EFSA re-evaluation of benzoic acid and benzoates (E210-E213), 2016", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4433" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e220": {
+    "eNumber": "E220",
+    "name": "Sulphur dioxide",
+    "tier": "moderate",
+    "reason": "EFSA's 2022 re-evaluation could not confirm the safety of the previous ADI due to data gaps, and some people are sensitive to sulphites; it must be declared as an allergen in the EU and US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sulphur dioxide and sulphites (E220-E228), 2022", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/7594" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e249": {
+    "eNumber": "E249",
+    "name": "Potassium nitrite",
+    "tier": "higher",
+    "reason": "Curing salt for processed meats; EFSA's 2023 assessment found dietary exposure to nitrosamines, which can form from nitrites, raises a health concern across age groups.",
+    "sources": [
+      { "name": "EFSA opinion on nitrosamines in food, 2023", "url": "https://www.efsa.europa.eu/en/news/nitrosamines-food-raise-health-concern" },
+      { "name": "IARC Monographs vol. 114 (processed meat), 2015", "url": "https://monographs.iarc.who.int/list-of-classifications" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e250": {
+    "eNumber": "E250",
+    "name": "Sodium nitrite",
+    "tier": "higher",
+    "reason": "Curing salt for processed meats; EFSA's 2023 assessment found dietary exposure to nitrosamines, which can form from nitrites, raises a health concern, and the EU tightened permitted levels in 2023.",
+    "sources": [
+      { "name": "EFSA opinion on nitrosamines in food, 2023", "url": "https://www.efsa.europa.eu/en/news/nitrosamines-food-raise-health-concern" },
+      { "name": "EU Regulation 2023/2108 (lower limits for nitrites and nitrates)", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2108" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e251": {
+    "eNumber": "E251",
+    "name": "Sodium nitrate",
+    "tier": "moderate",
+    "reason": "Can convert to nitrite in the body; EFSA re-confirmed the ADI in 2017 but the EU lowered permitted use levels in 2023 as a precaution around nitrosamine formation.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sodium and potassium nitrate (E251-E252), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4787" },
+      { "name": "EU Regulation 2023/2108 (lower limits for nitrites and nitrates)", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2108" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e260": {
+    "eNumber": "E260",
+    "name": "Acetic acid",
+    "tier": "low",
+    "reason": "The acid in vinegar; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of acetic acid (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e270": {
+    "eNumber": "E270",
+    "name": "Lactic acid",
+    "tier": "low",
+    "reason": "Naturally produced in fermentation; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of lactic acid (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e296": {
+    "eNumber": "E296",
+    "name": "Malic acid",
+    "tier": "low",
+    "reason": "Fruit acid found naturally in apples; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of malic acid (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e300": {
+    "eNumber": "E300",
+    "name": "Ascorbic acid (vitamin C)",
+    "tier": "low",
+    "reason": "Vitamin C used as an antioxidant; EFSA found no safety concern and no need for a numeric ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of ascorbic acid (E300-E302), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4087" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e306": {
+    "eNumber": "E306",
+    "name": "Tocopherol-rich extract (vitamin E)",
+    "tier": "low",
+    "reason": "Vitamin E used as an antioxidant; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of tocopherols (E306-E309), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4247" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e320": {
+    "eNumber": "E320",
+    "name": "Butylated hydroxyanisole (BHA)",
+    "tier": "moderate",
+    "reason": "Synthetic antioxidant with an EFSA ADI; IARC classifies it as Group 2B (possibly carcinogenic, based on high-dose animal data) while typical dietary exposure stays below the ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of BHA (E320), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2392" },
+      { "name": "IARC Monographs list of classifications (BHA, Group 2B)", "url": "https://monographs.iarc.who.int/list-of-classifications" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e321": {
+    "eNumber": "E321",
+    "name": "Butylated hydroxytoluene (BHT)",
+    "tier": "moderate",
+    "reason": "Synthetic antioxidant; EFSA set an ADI in 2012 and high consumers can approach it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of BHT (E321), 2012", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2588" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e322": {
+    "eNumber": "E322",
+    "name": "Lecithins",
+    "tier": "low",
+    "reason": "Emulsifier usually from soy or sunflower; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of lecithins (E322), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4742" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e330": {
+    "eNumber": "E330",
+    "name": "Citric acid",
+    "tier": "low",
+    "reason": "Fruit acid found naturally in citrus; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of citric acid (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e331": {
+    "eNumber": "E331",
+    "name": "Sodium citrates",
+    "tier": "low",
+    "reason": "Salts of citric acid used to regulate acidity; regulators place no numeric intake limit on them.",
+    "sources": [
+      { "name": "JECFA evaluation of citrates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e338": {
+    "eNumber": "E338",
+    "name": "Phosphoric acid",
+    "tier": "moderate",
+    "reason": "EFSA set a group intake limit for phosphates in 2019 and estimated that high consumers, especially children and teens, can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e406": {
+    "eNumber": "E406",
+    "name": "Agar",
+    "tier": "low",
+    "reason": "Seaweed-derived gelling agent; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of agar (E406), 2016", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4645" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e407": {
+    "eNumber": "E407",
+    "name": "Carrageenan",
+    "tier": "moderate",
+    "reason": "Seaweed-derived thickener; EFSA kept a temporary ADI in 2018 because of data gaps and asked for further studies.",
+    "sources": [
+      { "name": "EFSA re-evaluation of carrageenan (E407), 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5238" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e410": {
+    "eNumber": "E410",
+    "name": "Locust bean gum",
+    "tier": "low",
+    "reason": "Carob-seed thickener; EFSA found no safety concern for the general population at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of locust bean gum (E410), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4646" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e412": {
+    "eNumber": "E412",
+    "name": "Guar gum",
+    "tier": "low",
+    "reason": "Plant-seed thickener; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of guar gum (E412), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4669" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e415": {
+    "eNumber": "E415",
+    "name": "Xanthan gum",
+    "tier": "low",
+    "reason": "Fermentation-derived thickener; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of xanthan gum (E415), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4909" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e422": {
+    "eNumber": "E422",
+    "name": "Glycerol",
+    "tier": "low",
+    "reason": "Humectant naturally present in fats; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of glycerol (E422), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4720" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e433": {
+    "eNumber": "E433",
+    "name": "Polysorbate 80",
+    "tier": "moderate",
+    "reason": "Emulsifier with an EFSA group ADI; EFSA noted data gaps at re-evaluation and research on emulsifier effects on the gut is ongoing.",
+    "sources": [
+      { "name": "EFSA re-evaluation of polysorbates (E432-E436), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4152" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e440": {
+    "eNumber": "E440",
+    "name": "Pectins",
+    "tier": "low",
+    "reason": "Fruit-derived gelling agent; EFSA found no safety concern and no need for a numeric ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of pectins (E440i, E440ii), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4866" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e450": {
+    "eNumber": "E450",
+    "name": "Diphosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e466": {
+    "eNumber": "E466",
+    "name": "Carboxymethylcellulose (cellulose gum)",
+    "tier": "moderate",
+    "reason": "EFSA found no safety concern at re-evaluation but noted data gaps, and research on emulsifier effects on the gut microbiome is ongoing.",
+    "sources": [
+      { "name": "EFSA re-evaluation of celluloses including E466, 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5047" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e471": {
+    "eNumber": "E471",
+    "name": "Mono- and diglycerides of fatty acids",
+    "tier": "low",
+    "reason": "Emulsifiers digested like ordinary dietary fats; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of mono- and diglycerides (E471), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5045" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e500": {
+    "eNumber": "E500",
+    "name": "Sodium carbonates (baking soda)",
+    "tier": "low",
+    "reason": "Common raising agent; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of sodium carbonates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e621": {
+    "eNumber": "E621",
+    "name": "Monosodium glutamate (MSG)",
+    "tier": "moderate",
+    "reason": "EFSA set a group ADI for glutamates in 2017 and estimated that some population groups can exceed it; glutamate is otherwise a normal component of protein-rich foods.",
+    "sources": [
+      { "name": "EFSA re-evaluation of glutamic acid and glutamates (E620-E625), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4910" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e924": {
+    "eNumber": "E924",
+    "name": "Potassium bromate",
+    "tier": "higher",
+    "reason": "Flour treatment agent withdrawn from food use in the EU, UK, and Canada; IARC classifies it as Group 2B based on animal studies, and it remains permitted with limits in some jurisdictions.",
+    "sources": [
+      { "name": "IARC Monographs list of classifications (potassium bromate, Group 2B)", "url": "https://monographs.iarc.who.int/list-of-classifications" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e950": {
+    "eNumber": "E950",
+    "name": "Acesulfame K",
+    "tier": "moderate",
+    "reason": "Sweetener with an EFSA ADI that typical intakes stay within; the WHO's 2023 guideline advises against relying on non-sugar sweeteners for weight management.",
+    "sources": [
+      { "name": "EFSA re-evaluation of acesulfame K (E950), 2025", "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners" },
+      { "name": "WHO guideline on non-sugar sweeteners, 2023", "url": "https://www.who.int/publications/i/item/9789240073616" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e951": {
+    "eNumber": "E951",
+    "name": "Aspartame",
+    "tier": "moderate",
+    "reason": "EFSA and JECFA maintain an ADI that typical intakes stay well within; IARC classified it Group 2B (limited evidence) in 2023, which JECFA reviewed without changing the ADI.",
+    "sources": [
+      { "name": "EFSA full risk assessment of aspartame, 2013", "url": "https://www.efsa.europa.eu/en/topics/topic/aspartame" },
+      { "name": "IARC/JECFA joint statement on aspartame, 2023", "url": "https://www.who.int/news/item/14-07-2023-aspartame-hazard-and-risk-assessment-results-released" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e955": {
+    "eNumber": "E955",
+    "name": "Sucralose",
+    "tier": "moderate",
+    "reason": "Sweetener with a JECFA/EFSA ADI that typical intakes stay within; the WHO's 2023 guideline advises against relying on non-sugar sweeteners for weight management and EFSA re-evaluation is ongoing.",
+    "sources": [
+      { "name": "EFSA sweeteners re-evaluation programme", "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners" },
+      { "name": "WHO guideline on non-sugar sweeteners, 2023", "url": "https://www.who.int/publications/i/item/9789240073616" }
+    ],
+    "lastReviewed": "2026-07"
+  }
+}
