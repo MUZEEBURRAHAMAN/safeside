@@ -191,21 +191,123 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Compact score indicator
+
+/// A compact score indicator for dense list/card contexts (pantry rows,
+/// trending cards) — deliberately smaller and less repetitive than
+/// `ScoreBadge` (which is sized for the result screen's brand moment, §5.2):
+/// the number appears once, inside the disc, instead of being repeated as
+/// "N / 100" underneath. It's paired with the same word label `ScoreBadge`
+/// uses, so color is never the sole signal (§8). Band colors mirror
+/// `ScoreBadge`'s mapping exactly — never red for `.low`, per CLAUDE.md's
+/// ED-safe rule.
+private struct ScoreDisc: View {
+    /// `.stacked` — disc above a centered, wrapping label; used in the
+    /// pantry row's narrow trailing column. `.inline` — disc beside a
+    /// leading label; used in the wider trending card. (Named `Arrangement`,
+    /// not `Layout`, to avoid any ambiguity with SwiftUI's own `Layout`
+    /// protocol.)
+    enum Arrangement { case stacked, inline }
+
+    let score: Int?
+    let band: ScoreBand
+    var arrangement: Arrangement = .stacked
+
+    private var color: Color {
+        switch band {
+        case .high: return Theme.scoreHigh
+        case .mid: return Theme.scoreMid
+        case .low: return Theme.scoreLow
+        case .unknown: return Theme.scoreUnknown
+        }
+    }
+
+    private var accessibilityText: String {
+        score.map { "Score \($0) of 100, \(band.label)" } ?? band.label
+    }
+
+    private var disc: some View {
+        ZStack {
+            Circle().fill(color).frame(width: 44, height: 44)
+            Text(score.map(String.init) ?? "—")
+                .font(.system(.callout, design: .rounded).weight(.bold))
+                .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private var label: some View {
+        Text(band.label)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(Theme.textSecondary)
+    }
+
+    var body: some View {
+        Group {
+            switch arrangement {
+            case .stacked:
+                VStack(spacing: 2) {
+                    disc
+                    label
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                .frame(width: 76)
+            case .inline:
+                HStack(spacing: Theme.Space.s2) {
+                    disc
+                    label
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+}
+
+/// Shared "surface card" look for the redesigned pantry row and trending
+/// card (docs/DESIGN_SYSTEM.md §5.4: `bg.surface`, subtle border, `radius.md`,
+/// `elevation.1`). Callers apply their own `space.4` padding first — the
+/// pantry row's padding wraps the favorite heart too, while the trending
+/// card's doesn't.
+private extension View {
+    func homeCardSurface() -> some View {
+        background(Theme.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .strokeBorder(Theme.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+            // §4 elevation.1 (y2, blur8, ~6% navy) — no dedicated "navy" token
+            // exists, so this reuses `Theme.ink` at low opacity. Kept faint by
+            // design (§1: calm, not flashy).
+            .shadow(color: Theme.ink.opacity(0.06), radius: 4, x: 0, y: 2)
+    }
+}
+
 // MARK: - Pantry row
 
-/// One pantry row: a `NavigationLink` (thumbnail, name, brand, compact score
-/// badge — docs/DESIGN_SYSTEM.md §5.4 "Pantry card", reusing the existing
-/// `ScoreBadge(.compact)` §5.2) plus a favorite heart. The heart is a
-/// **sibling** of the `NavigationLink`, not nested inside its label — SwiftUI
-/// does not reliably route taps to a `Button` embedded inside another
-/// button/link's label, so nesting them would make the heart untappable (or
-/// double-fire navigation). Keeping them as HStack siblings gives each its
-/// own independent 44×44pt tap target.
+/// One pantry row, redesigned as a **single** surface card containing
+/// everything — thumbnail, name/brand, score, and the favorite heart
+/// (docs/DESIGN_SYSTEM.md §5.4 "Pantry card": "thumbnail, name, score badge,
+/// favorite toggle"). The heart is still a **sibling** of the `NavigationLink`,
+/// not nested inside its label — SwiftUI does not reliably route taps to a
+/// `Button` embedded inside another button/link's label, so nesting them
+/// would make the heart untappable (or double-fire navigation). Keeping them
+/// as HStack siblings (both wrapped in one shared card background) gives each
+/// its own independent 44×44pt tap target while looking like one row, not a
+/// floating heart bolted onto the outside of a card.
 private struct PantryRowContent: View {
     let entry: PantryEntry
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.Space.s2) {
+        HStack(spacing: Theme.Space.s3) {
             NavigationLink {
                 ProductView(product: entry.asProduct())
             } label: {
@@ -216,6 +318,8 @@ private struct PantryRowContent: View {
 
             FavoriteHeartInline(productID: entry.product.id)
         }
+        .padding(Theme.Space.s4)
+        .homeCardSurface()
     }
 }
 
@@ -224,7 +328,7 @@ private struct PantryRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.Space.s3) {
-            ProductThumbnail(urlString: entry.product.images?.bestURL, size: 64)
+            ProductThumbnail(urlString: entry.product.images?.bestURL, size: 56)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.product.name)
@@ -238,13 +342,13 @@ private struct PantryRow: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: 96, alignment: .leading)
+            // Flexible, not a fixed 96pt frame — takes whatever width is left
+            // after the thumbnail/score/heart, so names truncate correctly
+            // instead of wrapping a narrow fixed column.
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            ScoreBadge(score: entry.score?.score, band: entry.band)
+            ScoreDisc(score: entry.score?.score, band: entry.band)
         }
-        .padding(Theme.Space.s3)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
         .accessibilityElement(children: .combine)
     }
 }
@@ -275,6 +379,7 @@ private struct TrendingCardContent: View {
         .overlay(alignment: .topTrailing) {
             FavoriteHeartInline(productID: entry.product.id)
                 .padding(.trailing, Theme.Space.s1)
+                .padding(.top, Theme.Space.s1)
         }
     }
 }
@@ -300,13 +405,18 @@ private struct TrendingCardBody: View {
                         .lineLimit(1)
                 }
             }
+            // Reserves the same vertical space whether a card's name is one
+            // line or two, and whether a brand is present — so the score row
+            // below starts at the same height across every card in the row
+            // (the "align tops" requirement), without clamping the card to a
+            // hard total height that could clip at large Dynamic Type sizes.
+            .frame(minHeight: 54, alignment: .top)
 
-            ScoreBadge(score: entry.score.score, band: entry.band)
+            ScoreDisc(score: entry.score.score, band: entry.band, arrangement: .inline)
         }
-        .padding(Theme.Space.s3)
+        .padding(Theme.Space.s4)
         .frame(width: 240, alignment: .leading)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .homeCardSurface()
         .accessibilityElement(children: .combine)
     }
 }
@@ -380,45 +490,57 @@ private struct PantrySkeletonList: View {
     }
 }
 
+/// Matches `PantryRowContent`'s compact geometry exactly (56pt thumbnail,
+/// `space.4` card padding, 44pt score placeholder, 44pt heart placeholder) so
+/// loading never jumps once real rows arrive.
 private struct SkeletonPantryRow: View {
     var body: some View {
         HStack(spacing: Theme.Space.s3) {
             RoundedRectangle(cornerRadius: Theme.Radius.sm)
                 .fill(Theme.border.opacity(0.6))
-                .frame(width: 64, height: 64)
+                .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: Theme.Space.s2) {
                 RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 12)
                 RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 60, height: 10)
             }
-            .frame(width: 96)
-            Circle().fill(Theme.border.opacity(0.6)).frame(width: 64, height: 64)
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Circle().fill(Theme.border.opacity(0.6)).frame(width: 44, height: 44)
+            Circle().fill(Theme.border.opacity(0.35)).frame(width: 44, height: 44)
         }
-        .padding(Theme.Space.s3)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .padding(Theme.Space.s4)
+        .homeCardSurface()
     }
 }
 
-/// Skeleton loader for the horizontal trending row.
+/// Skeleton loader for the horizontal trending row — mirrors
+/// `TrendingCardBody`'s geometry (240pt width, `space.4` padding, reserved
+/// name-block height, inline score placeholder).
 private struct TrendingSkeletonRow: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Theme.Space.s3) {
+            HStack(alignment: .top, spacing: Theme.Space.s3) {
                 ForEach(0..<3, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: Theme.Space.s2) {
                         RoundedRectangle(cornerRadius: Theme.Radius.sm)
                             .fill(Theme.border.opacity(0.6))
                             .frame(width: 56, height: 56)
-                        RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 12)
-                        RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 80, height: 10)
+                        VStack(alignment: .leading, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 12)
+                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(width: 120, height: 12)
+                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 80, height: 10)
+                        }
+                        .frame(minHeight: 54, alignment: .top)
+                        HStack(spacing: Theme.Space.s2) {
+                            Circle().fill(Theme.border.opacity(0.6)).frame(width: 44, height: 44)
+                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 90, height: 10)
+                        }
                     }
-                    .padding(Theme.Space.s3)
+                    .padding(Theme.Space.s4)
                     .frame(width: 240, alignment: .leading)
-                    .background(Theme.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    .homeCardSurface()
                 }
             }
+            .padding(.vertical, Theme.Space.s1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading trending products")
@@ -437,6 +559,20 @@ private struct TrendingSkeletonRow: View {
         .environment(pantry)
 }
 
+#Preview("Pantry — recent list") {
+    NavigationStack {
+        ScrollView {
+            VStack(spacing: Theme.Space.s3) {
+                PantryRowContent(entry: .previewShort)
+                PantryRowContent(entry: .previewLongName)
+                PantryRowContent(entry: .previewFavorited)
+            }
+            .padding()
+        }
+    }
+    .environment(PantryService(session: SessionService()))
+}
+
 #Preview("Pantry row — favorited") {
     NavigationStack {
         PantryRowContent(entry: .previewFavorited)
@@ -445,10 +581,15 @@ private struct TrendingSkeletonRow: View {
     .environment(PantryService(session: SessionService()))
 }
 
-#Preview("Trending card") {
+#Preview("Trending cards") {
     NavigationStack {
-        TrendingCardContent(entry: .preview)
+        ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: Theme.Space.s3) {
+                TrendingCardContent(entry: .preview)
+                TrendingCardContent(entry: .previewLongName)
+            }
             .padding()
+        }
     }
     .environment(PantryService(session: SessionService()))
 }
@@ -462,6 +603,66 @@ private struct TrendingSkeletonRow: View {
 }
 
 fileprivate extension PantryEntry {
+    static let previewShort = PantryEntry(
+        item: PantryItemRow(
+            id: "item-0",
+            userID: "user-1",
+            productID: "product-0",
+            status: .scanned,
+            firstScannedAt: Date(),
+            lastSeenAt: Date()
+        ),
+        product: ProductRow(
+            id: "product-0",
+            barcode: "0000000000000",
+            name: "Plain Greek Yogurt",
+            brand: "Meadow Co.",
+            images: nil,
+            allergensTags: ["Milk"],
+            dataConfidence: "high"
+        ),
+        score: ScoreResultRow(
+            id: "score-0",
+            productID: "product-0",
+            score: 74,
+            band: .mid,
+            confidence: "high",
+            scoreVersion: "1.0",
+            computedAt: Date()
+        )
+    )
+
+    /// Exercises the flexible name column + wrapping score label at their
+    /// worst case: a long name, a long brand, and a low-band score.
+    static let previewLongName = PantryEntry(
+        item: PantryItemRow(
+            id: "item-2",
+            userID: "user-1",
+            productID: "product-3",
+            status: .scanned,
+            firstScannedAt: Date(),
+            lastSeenAt: Date()
+        ),
+        product: ProductRow(
+            id: "product-3",
+            barcode: "1111111111111",
+            name: "Biscuits Sablés aux Amandes Décortiquées et Chocolat Noir",
+            brand: "Maison Boulangère Artisanale",
+            images: nil,
+            allergensTags: ["Milk", "Wheat"],
+            dataConfidence: "limited"
+        ),
+        score: ScoreResultRow(
+            id: "score-3",
+            productID: "product-3",
+            score: 41,
+            band: .low,
+            confidence: "limited",
+            scoreVersion: "1.0",
+            computedAt: Date()
+        )
+    )
+
     static let previewFavorited = PantryEntry(
         item: PantryItemRow(
             id: "item-1",
@@ -507,6 +708,29 @@ fileprivate extension TrendingEntry {
             id: "score-2",
             productID: "product-2",
             score: 91,
+            band: .high,
+            confidence: "high",
+            scoreVersion: "1.0",
+            computedAt: Date()
+        )
+    )
+
+    /// Exercises the trending card's reserved name-block height + inline
+    /// score label wrapping with a long name/brand pair.
+    static let previewLongName = TrendingEntry(
+        product: ProductRow(
+            id: "product-4",
+            barcode: "2222222222222",
+            name: "Amandes Décortiquées Non Salées Bio",
+            brand: "Ferme du Val Vert Artisanale",
+            images: nil,
+            allergensTags: ["Tree nuts"],
+            dataConfidence: "high"
+        ),
+        score: ScoreResultRow(
+            id: "score-4",
+            productID: "product-4",
+            score: 96,
             band: .high,
             confidence: "high",
             scoreVersion: "1.0",

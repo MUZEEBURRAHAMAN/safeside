@@ -61,6 +61,10 @@ targets:
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
+        # Bundled display font (Space Grotesk, OFL) — the brand headline/score
+        # face per DESIGN_SYSTEM.md §3. Body/UI stays SF Pro (Dynamic Type).
+        UIAppFonts:
+          - SpaceGrotesk.ttf
         # Injected from Config.xcconfig at build time — never hardcode secrets here.
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
