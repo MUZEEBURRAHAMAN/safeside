@@ -1,23 +1,24 @@
 import SwiftUI
 
-/// Signature component (docs/DESIGN_SYSTEM.md §5.2). Three redundant signals —
-/// number + word label + icon — so the verdict is never carried by color alone
-/// (§8 a11y). Non-alarmist by design: the low band uses a muted clay, never
-/// alarm red (CLAUDE.md ED-safe rule).
+/// Signature component (docs/DESIGN_SYSTEM_V3.md §5.3, §1 "light-first").
+/// The result screen's score treatment: a stroked band-tinted RING (never a
+/// filled disc, never a heavy full-width dark hero panel) — à la the Oasis
+/// detail page's circular score, but built from our own tokens and a
+/// Space Grotesk number (DesignKit §3, "the score number's brand moment").
 ///
-/// Two styles:
-/// - `.compact` — dense contexts (future Pantry/Meal cards, §5.4).
-/// - `.hero` — the product result screen's brand moment (§1 "bold brand, calm
-///   scores"); designed to sit on the dark `gradient.hero` surface.
+/// Three redundant signals — number + word + arc-length/color — so the
+/// verdict is never carried by color alone (§7 a11y). Non-alarmist by
+/// design: the low band uses a muted clay, never alarm red (CLAUDE.md
+/// ED-safe rule).
 struct ScoreBadge: View {
-    enum Style { case compact, hero }
-
     let score: Int?
     let band: ScoreBand
-    var style: Style = .compact
-    /// Hero only. When set, shows a 44×44pt "i" affordance (§5.2 "small 'i' to
-    /// expand why") that the caller wires to reveal/scroll to "why this score".
-    var onInfoTap: (() -> Void)? = nil
+
+    /// Scales gently with Dynamic Type (§7 "reflow, no clip") rather than
+    /// clipping the inner number — the ring grows instead. `relativeTo`
+    /// `.title2` keeps growth proportionate to the adjacent product title.
+    @ScaledMetric(relativeTo: .title2) private var diameter: CGFloat = 108
+    @ScaledMetric(relativeTo: .title2) private var lineWidth: CGFloat = 9
 
     private var color: Color {
         switch band {
@@ -28,13 +29,9 @@ struct ScoreBadge: View {
         }
     }
 
-    private var icon: String {
-        switch band {
-        case .high: return "leaf.fill"
-        case .mid: return "circle.lefthalf.filled"
-        case .low: return "exclamationmark.circle"   // informational, not alarmist
-        case .unknown: return "questionmark.circle"
-        }
+    private var progress: CGFloat {
+        guard let score else { return 0 }
+        return CGFloat(min(max(score, 0), 100)) / 100
     }
 
     private var accessibilityLabelText: String {
@@ -42,103 +39,65 @@ struct ScoreBadge: View {
     }
 
     var body: some View {
-        switch style {
-        case .compact: compactBody
-        case .hero: heroBody
-        }
-    }
+        ZStack {
+            // Track — the full circle, always visible so the arc reads as
+            // "this much of the ring", not a mystery partial shape.
+            Circle()
+                .stroke(Theme.border, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
 
-    // MARK: Compact — dense list/card contexts
+            if score != nil {
+                // The arc — starts at 12 o'clock, sweeps clockwise. A tiny
+                // minimum trim keeps a sliver visible even at score 0 rather
+                // than vanishing (still three redundant signals, never
+                // color-only, since the number + word are also shown).
+                Circle()
+                    .trim(from: 0, to: max(progress, 0.014))
+                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            } else {
+                // Unknown: a calm dashed ring — visibly "not filled in" yet,
+                // without reading as an error or a zero score.
+                Circle()
+                    .stroke(
+                        Theme.scoreUnknown,
+                        style: StrokeStyle(lineWidth: lineWidth * 0.6, lineCap: .round, dash: [1, lineWidth * 2.2])
+                    )
+            }
 
-    private var compactBody: some View {
-        HStack(spacing: Theme.Space.s3) {
-            ZStack {
-                Circle().fill(color).frame(width: 64, height: 64)
+            VStack(spacing: 1) {
                 Text(score.map(String.init) ?? "—")
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
-                    .minimumScaleFactor(0.6)
+                    .font(Font.display(30, weight: .bold, relativeTo: .title2))
+                    .foregroundStyle(Theme.textPrimary)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                Text(score != nil ? "/ 100" : "no score")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .minimumScaleFactor(0.7)
                     .lineLimit(1)
             }
-            .frame(width: 64, height: 64)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Label(band.label, systemImage: icon)
-                    .font(.headline)
-                    .foregroundStyle(Theme.textPrimary)
-                if let s = score {
-                    Text("\(s) / 100").font(.subheadline).foregroundStyle(Theme.textSecondary)
-                }
-            }
-            Spacer(minLength: 0)
+            .padding(lineWidth + 8)
         }
+        .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabelText)
     }
-
-    // MARK: Hero — the result screen's brand moment
-
-    private var heroBody: some View {
-        VStack(spacing: Theme.Space.s3) {
-            if let onInfoTap {
-                HStack {
-                    Spacer(minLength: 0)
-                    Button(action: onInfoTap) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Theme.ResultScreen.textOnDarkSecondary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Why this score")
-                }
-            }
-
-            VStack(spacing: Theme.Space.s2) {
-                Text(score.map(String.init) ?? "—")
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                    .foregroundStyle(Theme.ResultScreen.textOnDarkPrimary)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-
-                Label {
-                    Text(band.label).font(.title3.weight(.semibold))
-                } icon: {
-                    Image(systemName: icon)
-                }
-                .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
-                .padding(.horizontal, Theme.Space.s3)
-                .padding(.vertical, Theme.Space.s1)
-                .background(color, in: Capsule())
-
-                if let s = score {
-                    Text("\(s) / 100")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.ResultScreen.textOnDarkSecondary)
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilityLabelText)
-        }
-        .frame(maxWidth: .infinity)
-    }
 }
 
-#Preview("Compact") {
-    VStack(spacing: 16) {
-        ScoreBadge(score: 82, band: .high)
-        ScoreBadge(score: 53, band: .mid)
+#Preview("Score ring — all bands") {
+    HStack(spacing: 20) {
+        ScoreBadge(score: 88, band: .high)
+        ScoreBadge(score: 51, band: .mid)
         ScoreBadge(score: 27, band: .low)
         ScoreBadge(score: nil, band: .unknown)
     }
     .padding()
+    .background(Theme.canvas)
 }
 
-#Preview("Hero") {
-    VStack(spacing: 24) {
-        ScoreBadge(score: 88, band: .high, style: .hero, onInfoTap: {})
-        ScoreBadge(score: 27, band: .low, style: .hero, onInfoTap: {})
-        ScoreBadge(score: nil, band: .unknown, style: .hero)
-    }
-    .padding()
-    .background(Theme.ResultScreen.heroGradient)
+#Preview("Score ring — large Dynamic Type") {
+    ScoreBadge(score: 51, band: .mid)
+        .padding()
+        .background(Theme.canvas)
+        .dynamicTypeSize(.accessibility3)
 }

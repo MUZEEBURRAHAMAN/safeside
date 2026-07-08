@@ -1,18 +1,22 @@
 import SwiftUI
 
-/// Product result: the app's payoff screen — the trust moment. Score hero
-/// (brand moment, §5.2) → sourced "why this score" breakdown (§5.3, the
-/// transparency moat) → next action → ingredients → attribution.
+/// Product result: the app's payoff screen — the trust moment. Rebuilt to
+/// the Oasis-beating shape in docs/DESIGN_SYSTEM_V3.md §1/§5: a floating
+/// product image on the light canvas, a name+brand row with a stroked score
+/// RING (never a heavy dark hero), trust chips, a tri-metric row, the sourced
+/// "why this score" breakdown (the transparency moat), "what's inside"
+/// ingredient cards, allergens, sources, utility rows, and a next action.
 /// Never a dead-end (principle #4); every score is sourced and dose-aware.
 struct ProductView: View {
     let product: Product
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
 
-    @State private var heroVisible = false
+    @State private var identityVisible = false
 
     /// Working copy of `product`. `product` itself never changes (it's the
     /// caller's contract), but a pantry-list entry arrives "thin" — score
@@ -27,6 +31,8 @@ struct ProductView: View {
     @State private var ingredientsPhase: IngredientsLoadPhase = .idle
 
     @State private var showBetterOptionSheet = false
+    @State private var showMethodologySheet = false
+    @State private var showReportIssueSheet = false
 
     private enum IngredientsLoadPhase: Equatable { case idle, loading, failed }
 
@@ -48,44 +54,80 @@ struct ProductView: View {
         workingProduct.ingredients.isEmpty ? fetchedIngredients : workingProduct.ingredients
     }
 
+    /// Every factor + ingredient source, deduplicated, for the "Sources"
+    /// section (§8 — our credibility, alongside "Why this score").
+    private var allSources: [Source] {
+        var seen = Set<String>()
+        var result: [Source] = []
+        let factorSources = workingProduct.score?.factors.flatMap { $0.sources } ?? []
+        let ingredientSources = displayIngredients.flatMap { $0.sources }
+        for source in factorSources + ingredientSources {
+            let key = source.name + (source.url ?? "")
+            if seen.insert(key).inserted {
+                result.append(source)
+            }
+        }
+        return result
+    }
+
     private var apiClient: APIClient { APIClient(session: session) }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s5) {
-                    identitySection
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Space.s5) {
+                identityHeader
+                    .opacity(identityVisible ? 1 : 0)
+                    .scaleEffect(identityVisible ? 1 : 0.97)
+                    .onAppear { revealIdentity() }
 
-                    heroSection(proxy: proxy)
-                        .opacity(heroVisible ? 1 : 0)
-                        .scaleEffect(heroVisible ? 1 : 0.96)
-                        .onAppear { revealHero() }
+                triMetricSectionOrNone
 
-                    whyScoreOrNote
-                        .id("whyScore")
+                whyScoreOrNote
 
-                    // Next action — never a dead-end. The swaps engine isn't
-                    // built yet (Phase 3), so this opens a calm sheet with a
-                    // real, generic next step instead of a fabricated swap.
-                    NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
-                        showBetterOptionSheet = true
-                    }
+                ingredientsSection
 
-                    ingredientsSection
+                allergensSection
 
-                    AttributionFooter()
+                if !allSources.isEmpty {
+                    SourcesSection(sources: allSources)
                 }
-                .padding(.horizontal, Theme.Space.s4)
-                .padding(.vertical, Theme.Space.s5)
+
+                UtilityRowsSection(
+                    onScoringInfo: { showMethodologySheet = true },
+                    onReportIssue: { showReportIssueSheet = true }
+                )
+
+                // Next action — never a dead-end. The swaps engine isn't
+                // built yet (Phase 3), so this opens a calm sheet with a
+                // real, generic next step instead of a fabricated swap.
+                NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
+                    showBetterOptionSheet = true
+                }
+
+                AttributionFooter()
+                    .frame(maxWidth: .infinity)
             }
-            .background(Theme.canvas)
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal, Theme.Space.s4)
+            .padding(.vertical, Theme.Space.s5)
+        }
+        .background(Theme.canvas)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                favoriteButton
+            }
         }
         .sheet(isPresented: $showBetterOptionSheet) {
             NextActionSheet(band: band) {
                 showBetterOptionSheet = false
                 dismiss()
             }
+        }
+        .sheet(isPresented: $showMethodologySheet) {
+            MethodologySheet()
+        }
+        .sheet(isPresented: $showReportIssueSheet) {
+            ReportIssueSheet(productName: workingProduct.name)
         }
         .task {
             // Order matters: the pantry re-fetch can itself populate
@@ -98,32 +140,62 @@ struct ProductView: View {
 
     // MARK: Sections
 
-    private var identitySection: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s3) {
-            HStack(alignment: .top, spacing: Theme.Space.s3) {
-                ProductThumbnail(urlString: workingProduct.imageURL)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(workingProduct.name)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let brand = workingProduct.brand, !brand.isEmpty {
-                        Text(brand)
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                }
-                Spacer(minLength: Theme.Space.s2)
-                favoriteButton
+    /// 1) Floating product image · 2) name/brand + score ring · 3) trust
+    /// chips. Reflows to a vertical stack at accessibility Dynamic Type
+    /// sizes instead of clipping the ring against the title (§7).
+    private var identityHeader: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+            HStack {
+                Spacer(minLength: 0)
+                FloatingProductImage(urlString: workingProduct.imageURL)
+                Spacer(minLength: 0)
             }
 
-            if !workingProduct.allergens.isEmpty {
-                AllergenChipsRow(allergens: workingProduct.allergens)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Space.s3) {
+                    titleBlock
+                    ScoreBadge(score: workingProduct.score?.score, band: band)
+                }
+            } else {
+                HStack(alignment: .center, spacing: Theme.Space.s4) {
+                    titleBlock
+                    ScoreBadge(score: workingProduct.score?.score, band: band)
+                }
             }
+
+            trustChipsRow
         }
     }
 
-    /// Brand-tinted (not alarm-colored) heart toggle. Reads
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(workingProduct.name)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if let brand = workingProduct.brand, !brand.isEmpty {
+                Text(brand)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 3) Category/data-source + confidence trust chips. There's no product
+    /// category in `Models.swift` today, so this deliberately shows only the
+    /// two chips we have real data for — the data source and the confidence
+    /// grade — rather than inventing a category label.
+    private var trustChipsRow: some View {
+        FlowLayout(spacing: Theme.Space.s2) {
+            SourceChip(name: "Open Food Facts")
+            ConfidenceChip(confidence: workingProduct.score?.confidence ?? workingProduct.dataConfidence)
+        }
+    }
+
+    /// Brand-tinted (not alarm-colored) heart toggle, in the nav bar per the
+    /// Oasis reference (bookmark top-trailing). Reads
     /// `pantryService.isFavorite(_:)` directly in `body` (rather than
     /// mirroring it into local `@State`) so it stays in sync whenever the
     /// `@Observable` PantryService's backing data changes elsewhere.
@@ -133,52 +205,60 @@ struct ProductView: View {
             Task { await pantryService.toggleFavorite(productID: workingProduct.id) }
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.greenDeep)
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
     }
 
-    private func heroSection(proxy: ScrollViewProxy) -> some View {
-        ScoreHeroSection(
-            score: workingProduct.score?.score,
-            band: band,
-            confidence: workingProduct.score?.confidence,
-            onInfoTap: {
-                let animation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.3)
-                withAnimation(animation) {
-                    proxy.scrollTo("whyScore", anchor: .top)
-                }
-            }
-        )
+    /// 4) Tri-metric row — only shown once we actually have factor data, so
+    /// it never fabricates sub-scores for a thin/unscored product (the "why"
+    /// section right below already covers that case in words).
+    @ViewBuilder
+    private var triMetricSectionOrNone: some View {
+        if let score = workingProduct.score, !score.factors.isEmpty {
+            TriMetricRow(factors: score.factors)
+        }
     }
 
+    /// 5) "Why this score" — sourced, dose-aware, default-open. Falls back to
+    /// an honest, calm note (no fabricated breakdown) when data is too thin.
     @ViewBuilder
     private var whyScoreOrNote: some View {
         if let score = workingProduct.score, !score.factors.isEmpty {
-            WhyScoreCard(score: score)
+            WhyScoreSection(score: score)
         } else {
-            SectionCard {
-                VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                    Text("Why this score")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("We don't have enough data yet to break this product down. Once more details come in, you'll see the full processing, nutrition, and additive breakdown here.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
-                }
+            CollapsibleSection {
+                Text("Why this score")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+            } content: {
+                Text("We don't have enough data yet to break this product down. Once more details come in, you'll see the full processing, nutrition, and additive breakdown here.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    @ViewBuilder
+    /// 6) "What's inside" — collapsible, default open (core ingredient
+    /// transparency); each ingredient renders as its own calm, color-coded
+    /// card, so the section itself stays plain (no double-card nesting).
     private var ingredientsSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s3) {
-            Text("Ingredients")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-
+        CollapsibleSection(cardStyle: false) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
+                Text("What's inside")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                if !displayIngredients.isEmpty {
+                    Text("\(displayIngredients.count)")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+        } content: {
             switch ingredientsPhase {
             case .loading:
                 IngredientsSkeletonView()
@@ -190,17 +270,26 @@ struct ProductView: View {
                 if displayIngredients.isEmpty {
                     EmptyIngredientsView()
                 } else {
-                    SectionCard {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(Array(displayIngredients.enumerated()), id: \.element.id) { index, ingredient in
-                                IngredientRow(ingredient: ingredient)
-                                if index < displayIngredients.count - 1 {
-                                    HairlineDivider()
-                                }
-                            }
+                    VStack(alignment: .leading, spacing: Theme.Space.s3) {
+                        ForEach(displayIngredients) { ingredient in
+                            IngredientCard(ingredient: ingredient)
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// 7) Allergens — informational chip row, calm caution tone (never
+    /// alarm-red). Only rendered when there's actually allergen data.
+    @ViewBuilder
+    private var allergensSection: some View {
+        if !workingProduct.allergens.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                Text("Allergens")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                AllergenChipsRow(allergens: workingProduct.allergens)
             }
         }
     }
@@ -264,14 +353,14 @@ struct ProductView: View {
 
     // MARK: Motion
 
-    /// Calm fade/scale reveal only (§7) — no bounce, and skipped entirely
-    /// under Reduce Motion.
-    private func revealHero() {
-        guard !heroVisible else { return }
+    /// Calm fade/scale reveal only (§6 Motion) — no bounce, and skipped
+    /// entirely under Reduce Motion.
+    private func revealIdentity() {
+        guard !identityVisible else { return }
         if reduceMotion {
-            heroVisible = true
+            identityVisible = true
         } else {
-            withAnimation(.easeOut(duration: 0.28)) { heroVisible = true }
+            withAnimation(Motion.reveal) { identityVisible = true }
         }
     }
 }
@@ -280,7 +369,15 @@ struct ProductView: View {
 
 #if DEBUG
 
-#Preview("High score — full confidence") {
+#Preview("Sample scored — mid, limited confidence (screenshot harness data)") {
+    NavigationStack {
+        ProductView(product: .sampleScored)
+    }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
+}
+
+#Preview("High score — high confidence") {
     NavigationStack {
         ProductView(product: .previewHighFullConfidence)
     }
@@ -296,7 +393,7 @@ struct ProductView: View {
     .environment(PantryService(session: SessionService()))
 }
 
-#Preview("Unknown score") {
+#Preview("Unknown score — no data") {
     NavigationStack {
         ProductView(product: .previewUnknownScore)
     }
@@ -310,6 +407,15 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+}
+
+#Preview("Accessibility XXL Dynamic Type") {
+    NavigationStack {
+        ProductView(product: .previewHighFullConfidence)
+    }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
+    .dynamicTypeSize(.accessibility3)
 }
 
 fileprivate extension Product {
@@ -419,7 +525,7 @@ fileprivate extension Product {
     )
 
     /// Mirrors `PantryEntry.asProduct()`'s thin read: a real `score` (so the
-    /// hero shows a number/band immediately) but empty `factors` and empty
+    /// ring shows a number/band immediately) but empty `factors` and empty
     /// `ingredients` — this is exactly the shape that should trigger
     /// `refreshThinPantryDataIfNeeded()` on appear.
     static let previewFromPantryThin = Product(
