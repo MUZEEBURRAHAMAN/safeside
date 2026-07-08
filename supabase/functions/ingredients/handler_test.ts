@@ -44,6 +44,22 @@ const KB: KbEntry[] = [
     what: "A flavour enhancer.",
     risk_tier: "moderate",
   }),
+  entry({
+    id: "en:e150d",
+    names: ["Sulphite ammonia caramel", "E150d"],
+    what: "A caramel colour.",
+    why_used: "Adds a brown colour.",
+    safety: "EFSA set a group ADI for caramel colours.",
+    risk_tier: "moderate",
+  }),
+  entry({
+    id: "en:e338",
+    names: ["Phosphoric acid", "E338"],
+    what: "A phosphate additive.",
+    why_used: "Regulates acidity.",
+    safety: "EFSA set a group intake limit for phosphates.",
+    risk_tier: "moderate",
+  }),
 ];
 
 interface FakeState {
@@ -140,6 +156,43 @@ Deno.test("buildCandidates resolves by id + synonym and preserves order", () => 
   assertEquals(cands[0].entry?.id, "en:sugar");
   assertEquals(cands[1].entry, null); // unknown
   assertEquals(cands[2].entry?.id, "en:e621");
+});
+
+Deno.test("buildCandidates surfaces additives absent from the text (the Coca-Cola case)", () => {
+  // E150d + E338 appear ONLY in additives_tags (the label hides them inside
+  // "colour (E150d)" etc., which the token parser strips).
+  const cands = buildCandidates(
+    {
+      additivesTags: ["en:e150d", "en:e338"],
+      ingredientsText: "Carbonated water, Sugar",
+    },
+    KB,
+  );
+  assertEquals(cands.map((c) => c.display), [
+    "Carbonated water", // unknown text token, kept in label order
+    "Sugar",
+    "Sulphite ammonia caramel", // en:e150d, appended from additives_tags
+    "Phosphoric acid", // en:e338, appended from additives_tags
+  ]);
+  assertEquals(cands[2].entry?.id, "en:e150d");
+  assertEquals(cands[3].entry?.id, "en:e338");
+});
+
+Deno.test("buildCandidates de-dupes an additive named in both text and additives_tags", () => {
+  // "Phosphoric acid" is a synonym of en:e338 AND listed in additives_tags.
+  const cands = buildCandidates(
+    { additivesTags: ["en:e338"], ingredientsText: "Sugar, Phosphoric acid" },
+    KB,
+  );
+  assertEquals(cands.map((c) => c.display), ["Sugar", "Phosphoric acid"]);
+  assertEquals(cands.filter((c) => c.entry?.id === "en:e338").length, 1);
+});
+
+Deno.test("buildCandidates tolerates an additive tag without the en: prefix", () => {
+  const cands = buildCandidates({ additivesTags: ["e338"], ingredientsText: null }, KB);
+  assertEquals(cands.length, 1);
+  assertEquals(cands[0].display, "Phosphoric acid");
+  assertEquals(cands[0].entry?.id, "en:e338");
 });
 
 // ---------------------------------------------------------------------------
@@ -247,4 +300,58 @@ Deno.test("missing LLM key → raw KB fields, still no fabrication", async () =>
   assertEquals(ingredients[0].riskTier, "low");
   // Even with no LLM, the explanation is cached for reuse.
   assertEquals(state.saved, ["en:sugar"]);
+});
+
+Deno.test("additives_tags [en:e150d, en:e338] get KB-sourced explanations for BOTH", async () => {
+  // The exact live regression: a cola whose E-numbers live only in
+  // additives_tags (not spelled out in the text) must still be explained.
+  const { deps, state } = makeDeps({
+    product: {
+      additivesTags: ["en:e150d", "en:e338"],
+      ingredientsText: "Carbonated water, Sugar",
+    },
+  });
+  const res = await handleIngredients(request(`/ingredients/${PRODUCT_ID}`), deps);
+  assertEquals(res.status, 200);
+  const { ingredients } = await res.json() as { ingredients: IngredientOut[] };
+  const byName = Object.fromEntries(ingredients.map((i) => [i.name, i]));
+
+  // Both additives resolved to full, sourced, KB-backed explanations.
+  for (const name of ["Sulphite ammonia caramel", "Phosphoric acid"]) {
+    assert(byName[name], `${name} should surface from additives_tags`);
+    assertEquals(byName[name].what, "rewritten"); // went through the LLM path
+    assertEquals(byName[name].confidence, "high");
+    // riskTier is copied verbatim from the KB — the LLM can't change it.
+    assertEquals(byName[name].riskTier, "moderate");
+  }
+
+  // Carbonated water is unknown; Sugar + both additives are the 3 KB hits.
+  assertEquals(byName["Carbonated water"].confidence, "limited");
+  assertEquals(state.llmCalls, 3);
+  assertEquals(state.saved.sort(), ["en:e150d", "en:e338", "en:sugar"]);
+});
+
+Deno.test("an additive in both the text and additives_tags is explained once", async () => {
+  const { deps } = makeDeps({
+    product: { additivesTags: ["en:e338"], ingredientsText: "Sugar, Phosphoric acid" },
+  });
+  const res = await handleIngredients(request(`/ingredients/${PRODUCT_ID}`), deps);
+  const { ingredients } = await res.json() as { ingredients: IngredientOut[] };
+  const e338 = ingredients.filter((i) => i.name === "Phosphoric acid");
+  assertEquals(e338.length, 1, "E338 must not be listed twice");
+  assertEquals(e338[0].riskTier, "moderate");
+});
+
+Deno.test("an additive tag with no KB entry → limited state, never the LLM", async () => {
+  const { deps, state } = makeDeps({
+    product: { additivesTags: ["en:e999"], ingredientsText: null },
+  });
+  const res = await handleIngredients(request(`/ingredients/${PRODUCT_ID}`), deps);
+  const { ingredients } = await res.json() as { ingredients: IngredientOut[] };
+  assertEquals(ingredients.length, 1);
+  assertEquals(ingredients[0].name, "E999");
+  assertEquals(ingredients[0].confidence, "limited");
+  assert(ingredients[0].what?.includes("don't have vetted info"));
+  assertEquals(ingredients[0].riskTier, null);
+  assertEquals(state.llmCalls, 0, "never call the LLM for an unknown additive");
 });

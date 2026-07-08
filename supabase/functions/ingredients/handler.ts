@@ -120,8 +120,23 @@ interface Candidate {
 }
 
 /**
- * Build the ordered, de-duplicated candidate list: ingredient tokens first
- * (label order preserved), then any additive tags not already covered.
+ * Build the ordered, de-duplicated candidate list from BOTH sources:
+ *
+ *   1. The free-text ingredient tokens (`ingredients_text`), in label order —
+ *      which is weight order, and the calm, non-fear-forward way to present a
+ *      product (principle: never lead with "here are the scary additives").
+ *   2. The product's `additives_tags` (OFF, e.g. "en:e150d"), each resolved
+ *      against the KB by the same "en:eNNN" key. This is essential: labels
+ *      routinely hide E-numbers inside parentheses ("colour (E150d)"), which
+ *      `parseIngredientTokens` strips — so an additive with a curated KB entry
+ *      would otherwise never surface. Additives are appended after the text
+ *      tokens (grouped, label order preserved above them).
+ *
+ * De-dupe is by resolved KB id: an additive that also appears as a text token
+ * (e.g. "Phosphoric acid" ↔ en:e338) is listed once. Because both paths
+ * resolve to the *same* KB entry, the served explanation, riskTier and sources
+ * are identical regardless of which path emitted it. Unknown tags keep their
+ * own display-keyed slot and fall through to the limited state downstream.
  */
 export function buildCandidates(
   row: ProductIngredientsRow,
@@ -145,10 +160,14 @@ export function buildCandidates(
   }
 
   for (const tag of row.additivesTags) {
-    const entry = byId.get(tag.toLowerCase()) ?? null;
+    // Resolve by the "en:eNNN" KB key; tolerate a tag stored without the
+    // "en:" prefix so we never miss a curated additive on a format quirk.
+    const norm = tag.toLowerCase().trim();
+    const key = norm.startsWith("en:") ? norm : `en:${norm}`;
+    const entry = byId.get(key) ?? byId.get(norm) ?? null;
     const display = entry
       ? (entry.names[0] ?? tag)
-      : tag.replace(/^en:/i, "").toUpperCase();
+      : key.replace(/^en:/i, "").toUpperCase();
     push(display, entry);
   }
 
