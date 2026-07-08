@@ -1,0 +1,2168 @@
+{
+  "_meta": {
+    "kb_version": "1.0",
+    "generated_by": "supabase/tools/build_kb_seed.py",
+    "note": "Additive entries are derived from additives_risk.json (risk_tier + safety + sources copied verbatim). Do not hand-edit; run the script.",
+    "count": 73
+  },
+  "entries": [
+    {
+      "id": "en:butter",
+      "names": [
+        "Butter"
+      ],
+      "what": "A dairy fat churned from cream.",
+      "why_used": "Adds flavour and richness and shapes texture in baking.",
+      "safety": "Butter is safe to eat; it is high in saturated fat, which health bodies suggest limiting.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with a milk allergy",
+        "people advised to limit saturated fat"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "baked goods",
+        "spreads",
+        "sauces",
+        "pastries"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: saturated and trans-fatty acid intake, 2023",
+          "url": "https://www.who.int/publications/i/item/9789240073630"
+        },
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:cocoa",
+      "names": [
+        "Cocoa",
+        "Cocoa mass",
+        "Cocoa solids",
+        "Cocoa powder"
+      ],
+      "what": "Solids from the cocoa bean.",
+      "why_used": "Gives chocolate flavour and colour.",
+      "safety": "Cocoa is a safe food ingredient; it naturally contains a small amount of caffeine.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "chocolate",
+        "baked goods",
+        "drinks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:cocoa-butter",
+      "names": [
+        "Cocoa butter"
+      ],
+      "what": "The natural fat of the cocoa bean.",
+      "why_used": "Gives chocolate its smooth texture and melt.",
+      "safety": "Cocoa butter is safe to eat and is high in saturated fat.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "chocolate",
+        "confectionery",
+        "coatings"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e100",
+      "names": [
+        "Curcumin",
+        "E100"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Natural turmeric color; EFSA set an ADI and typical dietary exposure stays within it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of curcumin (E100), 2010",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1679"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e101",
+      "names": [
+        "Riboflavin (vitamin B2)",
+        "E101"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "A B vitamin used as a yellow color; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of riboflavins (E101), 2013",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/3357"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e102",
+      "names": [
+        "Tartrazine",
+        "E102"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Azo color with an EFSA ADI; foods containing it in the EU must carry a note about possible effects on activity and attention in children.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of tartrazine (E102), 2009",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1331"
+        },
+        {
+          "name": "EU Regulation 1333/2008 Annex V (labelling of certain colours)",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32008R1333"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e104",
+      "names": [
+        "Quinoline yellow",
+        "E104"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "EFSA lowered its ADI in 2009 and EU labelling rules for certain colors apply; not authorized for food in the US.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of quinoline yellow (E104), 2009",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1329"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e110",
+      "names": [
+        "Sunset yellow FCF",
+        "E110"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Azo color; EFSA revised its ADI in 2014 and EU child-activity labelling rules apply.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA refined exposure assessment of sunset yellow (E110), 2014",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/3765"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e120",
+      "names": [
+        "Cochineal / carminic acid (carmine)",
+        "E120"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "EFSA maintained the ADI in 2015; rare hypersensitivity reactions are documented, so people with known sensitivity may want to check for it.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [
+        "people with a known carmine or cochineal sensitivity"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of cochineal, carminic acid, carmines (E120), 2015",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4288"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e122",
+      "names": [
+        "Azorubine / carmoisine",
+        "E122"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Azo color with an EFSA ADI; EU child-activity labelling rules apply and it is not authorized in the US.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of azorubine/carmoisine (E122), 2009",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1332"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e124",
+      "names": [
+        "Ponceau 4R",
+        "E124"
+      ],
+      "what": "A food additive.",
+      "why_used": "Serves a technical role such as texture, colour, or shelf life.",
+      "safety": "EFSA lowered its ADI in 2009; EU child-activity labelling rules apply and it is not authorized in the US.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "a range of packaged foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of Ponceau 4R (E124), 2009",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1328"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e127",
+      "names": [
+        "Erythrosine (Red 3)",
+        "E127"
+      ],
+      "what": "A food additive.",
+      "why_used": "Serves a technical role such as texture, colour, or shelf life.",
+      "safety": "The US FDA revoked its authorization for foods in January 2025 based on findings in laboratory animals; it remains permitted in limited uses elsewhere.",
+      "risk_tier": "higher",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "a range of packaged foods"
+      ],
+      "sources": [
+        {
+          "name": "FDA order revoking authorization of FD&C Red No. 3, 2025",
+          "url": "https://www.fda.gov/food/hfp-constituent-updates/fda-revoke-authorization-use-red-no-3-food-and-ingested-drugs"
+        },
+        {
+          "name": "EFSA re-evaluation of erythrosine (E127), 2011",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1854"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e129",
+      "names": [
+        "Allura red AC",
+        "E129"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Azo color with an EFSA ADI; EU child-activity labelling rules apply.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of Allura Red AC (E129), 2009",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1327"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e133",
+      "names": [
+        "Brilliant blue FCF",
+        "E133"
+      ],
+      "what": "A food additive.",
+      "why_used": "Serves a technical role such as texture, colour, or shelf life.",
+      "safety": "EFSA set an ADI and estimated dietary exposure stays below it for all population groups.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "a range of packaged foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of Brilliant Blue FCF (E133), 2010",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/1853"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e150d",
+      "names": [
+        "Sulphite ammonia caramel",
+        "E150d"
+      ],
+      "what": "A caramel colour (the sulphite ammonia type).",
+      "why_used": "Adds a brown colour, most familiar from colas.",
+      "safety": "EFSA set a group ADI for caramel colors; the 4-MEI byproduct is monitored and intake by high consumers can approach the ADI.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of caramel colours (E150a-d), 2011",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2004"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e160a",
+      "names": [
+        "Carotenes",
+        "E160a"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Plant-derived orange pigments (provitamin A); EFSA found reported food uses of mixed carotenes to be of no safety concern.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of mixed carotenes (E160a), 2012",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2593"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e160b",
+      "names": [
+        "Annatto extracts",
+        "E160b"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Seed-derived color; EFSA set updated ADIs in 2016 and exposure estimates stay within them.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA safety assessment of annatto extracts (E160b), 2016",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4544"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e160c",
+      "names": [
+        "Paprika extract",
+        "E160c"
+      ],
+      "what": "A colour used in food.",
+      "why_used": "Adds or restores colour so a product looks consistent.",
+      "safety": "Pepper-derived color; EFSA found no safety concern at reported use levels.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "coloured snacks",
+        "desserts"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of paprika extract (E160c), 2015",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4320"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e170",
+      "names": [
+        "Calcium carbonate",
+        "E170"
+      ],
+      "what": "A mineral used in food.",
+      "why_used": "Adds firmness, adjusts acidity, or provides a mineral.",
+      "safety": "A mineral (chalk) also used as a calcium source; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "supplemented foods",
+        "baked goods",
+        "canned vegetables"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of calcium carbonate (E170), 2011",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2318"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e171",
+      "names": [
+        "Titanium dioxide",
+        "E171"
+      ],
+      "what": "A white mineral colour (titanium dioxide).",
+      "why_used": "Makes foods and coatings look bright white or opaque.",
+      "safety": "EFSA concluded in 2021 that genotoxicity could not be ruled out and the EU withdrew its food authorization in 2022; it remains permitted in some other jurisdictions, including the US.",
+      "risk_tier": "higher",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "a range of packaged foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA safety assessment of titanium dioxide (E171), 2021",
+          "url": "https://www.efsa.europa.eu/en/news/titanium-dioxide-e171-no-longer-considered-safe-when-used-food-additive"
+        },
+        {
+          "name": "EU Regulation 2022/63 (removal of E171 from authorized additives)",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R0063"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e202",
+      "names": [
+        "Potassium sorbate",
+        "E202"
+      ],
+      "what": "A preservative.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "Common preservative; EFSA set a revised group ADI in 2019 and typical exposure stays within it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA revised group ADI for sorbic acid and potassium sorbate (E200, E202), 2019",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5625"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e211",
+      "names": [
+        "Sodium benzoate",
+        "E211"
+      ],
+      "what": "A preservative.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "Preservative with an EFSA group ADI; intake by children who consume many soft drinks can approach the ADI, and benzene can form in some drinks that also contain vitamin C.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "The benzene concern applies only to some drinks that also contain vitamin C, not to sodium benzoate in general"
+      ],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of benzoic acid and benzoates (E210-E213), 2016",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4433"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e220",
+      "names": [
+        "Sulphur dioxide",
+        "E220"
+      ],
+      "what": "Sulphur dioxide, a preservative and antioxidant.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "EFSA's 2022 re-evaluation could not confirm the safety of the previous ADI due to data gaps, and some people are sensitive to sulphites; it must be declared as an allergen in the EU and US.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [
+        "people who are sensitive to sulphites, including some people with asthma"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of sulphur dioxide and sulphites (E220-E228), 2022",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/7594"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e249",
+      "names": [
+        "Potassium nitrite",
+        "E249"
+      ],
+      "what": "A curing salt (potassium nitrite) for processed meats.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "Curing salt for processed meats; EFSA's 2023 assessment found dietary exposure to nitrosamines, which can form from nitrites, raises a health concern across age groups.",
+      "risk_tier": "higher",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA opinion on nitrosamines in food, 2023",
+          "url": "https://www.efsa.europa.eu/en/news/nitrosamines-food-raise-health-concern"
+        },
+        {
+          "name": "IARC Monographs vol. 114 (processed meat), 2015",
+          "url": "https://monographs.iarc.who.int/list-of-classifications"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e250",
+      "names": [
+        "Sodium nitrite",
+        "E250"
+      ],
+      "what": "A curing salt (sodium nitrite) for processed meats.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "Curing salt for processed meats; EFSA's 2023 assessment found dietary exposure to nitrosamines, which can form from nitrites, raises a health concern, and the EU tightened permitted levels in 2023.",
+      "risk_tier": "higher",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA opinion on nitrosamines in food, 2023",
+          "url": "https://www.efsa.europa.eu/en/news/nitrosamines-food-raise-health-concern"
+        },
+        {
+          "name": "EU Regulation 2023/2108 (lower limits for nitrites and nitrates)",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2108"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e251",
+      "names": [
+        "Sodium nitrate",
+        "E251"
+      ],
+      "what": "A preservative.",
+      "why_used": "Helps food keep longer by slowing spoilage from microbes.",
+      "safety": "Can convert to nitrite in the body; EFSA re-confirmed the ADI in 2017 but the EU lowered permitted use levels in 2023 as a precaution around nitrosamine formation.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sauces",
+        "baked goods",
+        "cured foods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of sodium and potassium nitrate (E251-E252), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4787"
+        },
+        {
+          "name": "EU Regulation 2023/2108 (lower limits for nitrites and nitrates)",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R2108"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e260",
+      "names": [
+        "Acetic acid",
+        "E260"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "The acid in vinegar; regulators place no numeric intake limit on it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of acetic acid (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e270",
+      "names": [
+        "Lactic acid",
+        "E270"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "Naturally produced in fermentation; regulators place no numeric intake limit on it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of lactic acid (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e296",
+      "names": [
+        "Malic acid",
+        "E296"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "Fruit acid found naturally in apples; regulators place no numeric intake limit on it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of malic acid (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e300",
+      "names": [
+        "Ascorbic acid (vitamin C)",
+        "E300"
+      ],
+      "what": "An antioxidant.",
+      "why_used": "Slows fats and oils from going rancid, protecting flavour.",
+      "safety": "Vitamin C used as an antioxidant; EFSA found no safety concern and no need for a numeric ADI.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "oils",
+        "snacks",
+        "spreads",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of ascorbic acid (E300-E302), 2015",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4087"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e306",
+      "names": [
+        "Tocopherol-rich extract (vitamin E)",
+        "E306"
+      ],
+      "what": "An antioxidant.",
+      "why_used": "Slows fats and oils from going rancid, protecting flavour.",
+      "safety": "Vitamin E used as an antioxidant; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "oils",
+        "snacks",
+        "spreads",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of tocopherols (E306-E309), 2015",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4247"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e320",
+      "names": [
+        "Butylated hydroxyanisole (BHA)",
+        "E320"
+      ],
+      "what": "An antioxidant.",
+      "why_used": "Slows fats and oils from going rancid, protecting flavour.",
+      "safety": "Synthetic antioxidant with an EFSA ADI; IARC classifies it as Group 2B (possibly carcinogenic, based on high-dose animal data) while typical dietary exposure stays below the ADI.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "The 'possibly carcinogenic' label reflects high-dose animal data; typical dietary intake stays below the regulatory limit"
+      ],
+      "found_in": [
+        "oils",
+        "snacks",
+        "spreads",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of BHA (E320), 2011",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2392"
+        },
+        {
+          "name": "IARC Monographs list of classifications (BHA, Group 2B)",
+          "url": "https://monographs.iarc.who.int/list-of-classifications"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e321",
+      "names": [
+        "Butylated hydroxytoluene (BHT)",
+        "E321"
+      ],
+      "what": "An antioxidant.",
+      "why_used": "Slows fats and oils from going rancid, protecting flavour.",
+      "safety": "Synthetic antioxidant; EFSA set an ADI in 2012 and high consumers can approach it.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "IARC and animal-study findings are about high doses; regulators set intake limits well below those levels"
+      ],
+      "found_in": [
+        "oils",
+        "snacks",
+        "spreads",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of BHT (E321), 2012",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2588"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e322",
+      "names": [
+        "Lecithins",
+        "E322"
+      ],
+      "what": "An emulsifier.",
+      "why_used": "Helps oil and water mix and stay smoothly blended.",
+      "safety": "Emulsifier usually from soy or sunflower; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "spreads",
+        "sauces",
+        "ice cream",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of lecithins (E322), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4742"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e330",
+      "names": [
+        "Citric acid",
+        "E330"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "Fruit acid found naturally in citrus; regulators place no numeric intake limit on it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of citric acid (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e331",
+      "names": [
+        "Sodium citrates",
+        "E331"
+      ],
+      "what": "A food acid.",
+      "why_used": "Adjusts acidity or adds a tart taste; can also help preserve.",
+      "safety": "Salts of citric acid used to regulate acidity; regulators place no numeric intake limit on them.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "preserves",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of citrates (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e338",
+      "names": [
+        "Phosphoric acid",
+        "E338"
+      ],
+      "what": "A phosphate used as an additive.",
+      "why_used": "Regulates acidity, raises baked goods, or holds moisture.",
+      "safety": "EFSA set a group intake limit for phosphates in 2019 and estimated that high consumers, especially children and teens, can exceed it.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "colas",
+        "processed cheese",
+        "baked goods",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e406",
+      "names": [
+        "Agar",
+        "E406"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Seaweed-derived gelling agent; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of agar (E406), 2016",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4645"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e407",
+      "names": [
+        "Carrageenan",
+        "E407"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Seaweed-derived thickener; EFSA kept a temporary ADI in 2018 because of data gaps and asked for further studies.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "Research on gut effects is ongoing; regulators kept only a temporary intake limit while asking for more studies"
+      ],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of carrageenan (E407), 2018",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5238"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e410",
+      "names": [
+        "Locust bean gum",
+        "E410"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Carob-seed thickener; EFSA found no safety concern for the general population at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of locust bean gum (E410), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4646"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e412",
+      "names": [
+        "Guar gum",
+        "E412"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Plant-seed thickener; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of guar gum (E412), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4669"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e415",
+      "names": [
+        "Xanthan gum",
+        "E415"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Fermentation-derived thickener; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of xanthan gum (E415), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4909"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e422",
+      "names": [
+        "Glycerol",
+        "E422"
+      ],
+      "what": "A humectant.",
+      "why_used": "Holds moisture so foods stay soft.",
+      "safety": "Humectant naturally present in fats; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "soft baked goods",
+        "confectionery",
+        "chewing gum"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of glycerol (E422), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4720"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e433",
+      "names": [
+        "Polysorbate 80",
+        "E433"
+      ],
+      "what": "An emulsifier.",
+      "why_used": "Helps oil and water mix and stay smoothly blended.",
+      "safety": "Emulsifier with an EFSA group ADI; EFSA noted data gaps at re-evaluation and research on emulsifier effects on the gut is ongoing.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "spreads",
+        "sauces",
+        "ice cream",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of polysorbates (E432-E436), 2015",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4152"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e440",
+      "names": [
+        "Pectins",
+        "E440"
+      ],
+      "what": "A thickener or gelling agent.",
+      "why_used": "Thickens or sets the texture of a food.",
+      "safety": "Fruit-derived gelling agent; EFSA found no safety concern and no need for a numeric ADI.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "desserts",
+        "dairy",
+        "sauces",
+        "jams"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of pectins (E440i, E440ii), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4866"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e450",
+      "names": [
+        "Diphosphates",
+        "E450"
+      ],
+      "what": "A phosphate used as an additive.",
+      "why_used": "Regulates acidity, raises baked goods, or holds moisture.",
+      "safety": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "colas",
+        "processed cheese",
+        "baked goods",
+        "processed meats"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e466",
+      "names": [
+        "Carboxymethylcellulose (cellulose gum)",
+        "E466"
+      ],
+      "what": "An emulsifier.",
+      "why_used": "Helps oil and water mix and stay smoothly blended.",
+      "safety": "EFSA found no safety concern at re-evaluation but noted data gaps, and research on emulsifier effects on the gut microbiome is ongoing.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "spreads",
+        "sauces",
+        "ice cream",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of celluloses including E466, 2018",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5047"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e471",
+      "names": [
+        "Mono- and diglycerides of fatty acids",
+        "E471"
+      ],
+      "what": "An emulsifier.",
+      "why_used": "Helps oil and water mix and stay smoothly blended.",
+      "safety": "Emulsifiers digested like ordinary dietary fats; EFSA found no safety concern at reported uses.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "spreads",
+        "sauces",
+        "ice cream",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of mono- and diglycerides (E471), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5045"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e500",
+      "names": [
+        "Sodium carbonates (baking soda)",
+        "E500"
+      ],
+      "what": "A raising agent.",
+      "why_used": "Releases gas so baked goods rise.",
+      "safety": "Common raising agent; regulators place no numeric intake limit on it.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "baked goods",
+        "self-raising flour",
+        "cake mixes"
+      ],
+      "sources": [
+        {
+          "name": "JECFA evaluation of sodium carbonates (ADI not limited)",
+          "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e621",
+      "names": [
+        "Monosodium glutamate (MSG)",
+        "E621"
+      ],
+      "what": "A flavour enhancer.",
+      "why_used": "Boosts the savoury (umami) taste of a food.",
+      "safety": "EFSA set a group ADI for glutamates in 2017 and estimated that some population groups can exceed it; glutamate is otherwise a normal component of protein-rich foods.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [
+        "people advised to limit sodium"
+      ],
+      "misconceptions": [
+        "A specific 'MSG sensitivity' has not been confirmed in controlled blind studies",
+        "Glutamate is a normal part of many everyday protein-rich foods"
+      ],
+      "found_in": [
+        "savoury snacks",
+        "seasonings",
+        "soups",
+        "ready meals"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of glutamic acid and glutamates (E620-E625), 2017",
+          "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4910"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e924",
+      "names": [
+        "Potassium bromate",
+        "E924"
+      ],
+      "what": "A flour treatment agent.",
+      "why_used": "Was used to strengthen dough and speed bread-making.",
+      "safety": "Flour treatment agent withdrawn from food use in the EU, UK, and Canada; IARC classifies it as Group 2B based on animal studies, and it remains permitted with limits in some jurisdictions.",
+      "risk_tier": "higher",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "It is already withdrawn from food use in the EU, UK, and Canada; where still allowed, limits apply"
+      ],
+      "found_in": [
+        "some breads and flours in jurisdictions that still allow it"
+      ],
+      "sources": [
+        {
+          "name": "IARC Monographs list of classifications (potassium bromate, Group 2B)",
+          "url": "https://monographs.iarc.who.int/list-of-classifications"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e950",
+      "names": [
+        "Acesulfame K",
+        "E950"
+      ],
+      "what": "A sweetener used in place of some or all sugar.",
+      "why_used": "Adds sweetness with little or no sugar and few or no calories.",
+      "safety": "Sweetener with an EFSA ADI that typical intakes stay within; the WHO's 2023 guideline advises against relying on non-sugar sweeteners for weight management.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "Regulators set an intake limit that typical use stays within; the WHO advice is about relying on sweeteners for weight loss, not about safety at normal intakes"
+      ],
+      "found_in": [
+        "diet soft drinks",
+        "sugar-free foods",
+        "tabletop sweeteners"
+      ],
+      "sources": [
+        {
+          "name": "EFSA re-evaluation of acesulfame K (E950), 2025",
+          "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners"
+        },
+        {
+          "name": "WHO guideline on non-sugar sweeteners, 2023",
+          "url": "https://www.who.int/publications/i/item/9789240073616"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e951",
+      "names": [
+        "Aspartame",
+        "E951"
+      ],
+      "what": "A sweetener used in place of some or all sugar.",
+      "why_used": "Adds sweetness with little or no sugar and few or no calories.",
+      "safety": "EFSA and JECFA maintain an ADI that typical intakes stay well within; IARC classified it Group 2B (limited evidence) in 2023, which JECFA reviewed without changing the ADI.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [
+        "people with phenylketonuria (PKU), because it contains phenylalanine"
+      ],
+      "misconceptions": [
+        "At normal intakes it has not been shown to cause the health harms sometimes claimed online"
+      ],
+      "found_in": [
+        "diet soft drinks",
+        "sugar-free foods",
+        "tabletop sweeteners"
+      ],
+      "sources": [
+        {
+          "name": "EFSA full risk assessment of aspartame, 2013",
+          "url": "https://www.efsa.europa.eu/en/topics/topic/aspartame"
+        },
+        {
+          "name": "IARC/JECFA joint statement on aspartame, 2023",
+          "url": "https://www.who.int/news/item/14-07-2023-aspartame-hazard-and-risk-assessment-results-released"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:e955",
+      "names": [
+        "Sucralose",
+        "E955"
+      ],
+      "what": "A sweetener used in place of some or all sugar.",
+      "why_used": "Adds sweetness with little or no sugar and few or no calories.",
+      "safety": "Sweetener with a JECFA/EFSA ADI that typical intakes stay within; the WHO's 2023 guideline advises against relying on non-sugar sweeteners for weight management and EFSA re-evaluation is ongoing.",
+      "risk_tier": "moderate",
+      "who_should_avoid": [],
+      "misconceptions": [
+        "The WHO advice is about using sweeteners for weight management, not a finding that normal intakes are harmful"
+      ],
+      "found_in": [
+        "diet soft drinks",
+        "sugar-free foods",
+        "tabletop sweeteners"
+      ],
+      "sources": [
+        {
+          "name": "EFSA sweeteners re-evaluation programme",
+          "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners"
+        },
+        {
+          "name": "WHO guideline on non-sugar sweeteners, 2023",
+          "url": "https://www.who.int/publications/i/item/9789240073616"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:egg",
+      "names": [
+        "Egg",
+        "Eggs",
+        "Whole egg",
+        "Egg white",
+        "Egg yolk"
+      ],
+      "what": "Hen's egg or a part of it.",
+      "why_used": "Binds, sets, and adds structure, richness, and colour.",
+      "safety": "Eggs are a safe, nutritious food for most people; they are a common allergen.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with an egg allergy"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "baked goods",
+        "pasta",
+        "sauces",
+        "mayonnaise"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:glucose-syrup",
+      "names": [
+        "Glucose syrup",
+        "Glucose-fructose syrup",
+        "Corn syrup"
+      ],
+      "what": "A liquid sugar made from starch, such as maize or wheat.",
+      "why_used": "Adds sweetness, texture, and shelf life and stops crystals forming.",
+      "safety": "Glucose syrup is a form of sugar; the WHO advice on limiting free sugars applies to it.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people managing diabetes may want to watch total sugars"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "sweets",
+        "soft drinks",
+        "baked goods",
+        "ice cream"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: sugars intake for adults and children, 2015",
+          "url": "https://www.who.int/publications/i/item/9789241549028"
+        },
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:high-fructose-corn-syrup",
+      "names": [
+        "High-fructose corn syrup",
+        "HFCS",
+        "High fructose corn syrup"
+      ],
+      "what": "A liquid sweetener made from corn starch with some glucose converted to fructose.",
+      "why_used": "A cheap liquid sweetener that adds sweetness and shelf life, common in drinks.",
+      "safety": "It is a form of sugar; the WHO advice on limiting free sugars applies to it as to other sugars.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people managing diabetes may want to watch total sugars"
+      ],
+      "misconceptions": [
+        "The evidence treats it much like other added sugars; the concern is total added sugar, not this syrup uniquely"
+      ],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "sauces",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: sugars intake for adults and children, 2015",
+          "url": "https://www.who.int/publications/i/item/9789241549028"
+        },
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:honey",
+      "names": [
+        "Honey"
+      ],
+      "what": "A natural sweetener made by bees.",
+      "why_used": "Adds sweetness and flavour.",
+      "safety": "Honey is a form of sugar and safe for most people; it should not be given to infants under 12 months.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "infants under 12 months",
+        "people managing diabetes may want to watch total sugars"
+      ],
+      "misconceptions": [
+        "Honey is still a sugar nutritionally, even though it is less processed than table sugar"
+      ],
+      "found_in": [
+        "cereals",
+        "spreads",
+        "drinks",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:maize-starch",
+      "names": [
+        "Maize starch",
+        "Corn starch",
+        "Cornflour"
+      ],
+      "what": "Starch extracted from maize (corn).",
+      "why_used": "Thickens sauces and adds structure or a light texture.",
+      "safety": "Maize starch is a safe, common food ingredient.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "sauces",
+        "soups",
+        "baked goods",
+        "custards"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:milk",
+      "names": [
+        "Milk",
+        "Cow's milk"
+      ],
+      "what": "Dairy milk.",
+      "why_used": "Adds flavour, protein, and richness.",
+      "safety": "Milk is a safe, nutritious food for most people; it is a common allergen and contains lactose.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with a milk allergy",
+        "people with lactose intolerance"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "dairy products",
+        "baked goods",
+        "chocolate",
+        "drinks"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:oat",
+      "names": [
+        "Oats",
+        "Oat",
+        "Oat flakes"
+      ],
+      "what": "A cereal grain, often rolled into flakes.",
+      "why_used": "A staple grain used in cereals and baking; a source of fibre.",
+      "safety": "Oats are a safe whole grain and a source of dietary fibre.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "some people with coeliac disease react to oats unless they are certified gluten-free"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "porridge",
+        "cereals",
+        "flapjacks",
+        "baked goods"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:olive-oil",
+      "names": [
+        "Olive oil"
+      ],
+      "what": "An oil pressed from olives.",
+      "why_used": "Used for cooking and dressings and for its flavour.",
+      "safety": "Olive oil is safe to eat and is rich in unsaturated fat.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "dressings",
+        "Mediterranean dishes",
+        "spreads",
+        "cooking oils"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:palm-oil",
+      "names": [
+        "Palm oil",
+        "Palm fat"
+      ],
+      "what": "A vegetable oil pressed from the fruit of the oil palm.",
+      "why_used": "Gives a smooth texture and long shelf life and stays solid at room temperature.",
+      "safety": "Palm oil is safe to eat; it is high in saturated fat, which health bodies suggest limiting to support heart health.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people advised to limit saturated fat"
+      ],
+      "misconceptions": [
+        "Concerns about palm oil centre on saturated fat and the environment, not on it being unsafe to eat"
+      ],
+      "found_in": [
+        "spreads",
+        "chocolate",
+        "baked goods",
+        "margarine"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: saturated and trans-fatty acid intake, 2023",
+          "url": "https://www.who.int/publications/i/item/9789240073630"
+        },
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:rapeseed-oil",
+      "names": [
+        "Rapeseed oil",
+        "Canola oil"
+      ],
+      "what": "A vegetable oil pressed from rapeseed (canola).",
+      "why_used": "A neutral cooking oil used for frying, baking, and dressings.",
+      "safety": "Rapeseed (canola) oil is safe to eat and is low in saturated fat.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "cooking oils",
+        "spreads",
+        "baked goods",
+        "mayonnaise"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:rice",
+      "names": [
+        "Rice",
+        "Rice flour"
+      ],
+      "what": "A cereal grain, sometimes milled into flour.",
+      "why_used": "A staple carbohydrate; rice flour adds structure in gluten-free foods.",
+      "safety": "Rice is a safe, widely eaten staple grain.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "rice dishes",
+        "gluten-free foods",
+        "cereals",
+        "snacks"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:salt",
+      "names": [
+        "Salt",
+        "Sodium chloride"
+      ],
+      "what": "Sodium chloride — the mineral we know as table salt.",
+      "why_used": "Adds flavour and, in many foods, helps preserve them and shape texture.",
+      "safety": "Salt is safe, but most people eat more sodium than health bodies suggest; the WHO recommends limiting sodium to help manage blood pressure.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people advised to limit sodium, for example for high blood pressure"
+      ],
+      "misconceptions": [
+        "Sea salt and pink salt are still mostly sodium chloride, like ordinary table salt"
+      ],
+      "found_in": [
+        "most savoury packaged foods",
+        "bread",
+        "snacks",
+        "sauces"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: sodium intake for adults and children, 2012",
+          "url": "https://www.who.int/publications/i/item/9789241504836"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:skimmed-milk-powder",
+      "names": [
+        "Skimmed milk powder",
+        "Skim milk powder",
+        "Nonfat dry milk"
+      ],
+      "what": "Milk with the fat and water removed, dried to a powder.",
+      "why_used": "Adds dairy solids, protein, and body without adding liquid.",
+      "safety": "Skimmed milk powder is safe for most people; it is a milk product and a common allergen.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with a milk allergy",
+        "people with lactose intolerance"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "chocolate",
+        "baked goods",
+        "ready meals",
+        "beverages"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:sugar",
+      "names": [
+        "Sugar",
+        "Sucrose"
+      ],
+      "what": "Sugar (mostly sucrose) that adds sweetness and energy.",
+      "why_used": "Adds sweetness and bulk, helps browning, and can help preserve foods like jam.",
+      "safety": "Sugar is safe as a food; the WHO suggests keeping free sugars below 10% of daily energy, and ideally 5%, mainly to protect teeth and help manage weight.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people managing diabetes may want to watch total sugars"
+      ],
+      "misconceptions": [
+        "The health guidance is about how much sugar we eat, not that any sugar is harmful in itself"
+      ],
+      "found_in": [
+        "soft drinks",
+        "sweets",
+        "baked goods",
+        "cereals"
+      ],
+      "sources": [
+        {
+          "name": "WHO guideline: sugars intake for adults and children, 2015",
+          "url": "https://www.who.int/publications/i/item/9789241549028"
+        },
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:sunflower-oil",
+      "names": [
+        "Sunflower oil",
+        "Sunflower seed oil"
+      ],
+      "what": "A vegetable oil pressed from sunflower seeds.",
+      "why_used": "Used for frying, texture, and as a neutral-tasting fat.",
+      "safety": "Sunflower oil is safe to eat and is mostly unsaturated fat.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "fried foods",
+        "spreads",
+        "dressings",
+        "snacks"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:water",
+      "names": [
+        "Water",
+        "Aqua"
+      ],
+      "what": "Plain water.",
+      "why_used": "Acts as a base or carrier and adjusts consistency.",
+      "safety": "Water is an essential nutrient with no intake concern in food.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "drinks",
+        "soups",
+        "sauces",
+        "many processed foods"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:wheat-flour",
+      "names": [
+        "Wheat flour",
+        "Flour",
+        "Wheat"
+      ],
+      "what": "Flour milled from wheat grain.",
+      "why_used": "Forms the structure of breads, baked goods, and batters.",
+      "safety": "Wheat flour is safe for most people; it contains gluten and is a common allergen.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with coeliac disease or a wheat allergy",
+        "people avoiding gluten"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "bread",
+        "pasta",
+        "baked goods",
+        "batters"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:whey",
+      "names": [
+        "Whey",
+        "Whey powder",
+        "Whey protein"
+      ],
+      "what": "The protein-rich liquid left when milk is made into cheese, often dried.",
+      "why_used": "Adds protein, flavour, and texture.",
+      "safety": "Whey is safe for most people; it is a milk product and a common allergen.",
+      "risk_tier": "low",
+      "who_should_avoid": [
+        "people with a milk allergy"
+      ],
+      "misconceptions": [],
+      "found_in": [
+        "chocolate",
+        "baked goods",
+        "protein products",
+        "processed foods"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    },
+    {
+      "id": "en:yeast",
+      "names": [
+        "Yeast",
+        "Baker's yeast"
+      ],
+      "what": "A microorganism used to leaven bread and in fermentation.",
+      "why_used": "Makes dough rise and adds flavour.",
+      "safety": "Baker's yeast is a safe, common food ingredient.",
+      "risk_tier": "low",
+      "who_should_avoid": [],
+      "misconceptions": [],
+      "found_in": [
+        "bread",
+        "baked goods",
+        "spreads",
+        "fermented foods"
+      ],
+      "sources": [
+        {
+          "name": "USDA FoodData Central",
+          "url": "https://fdc.nal.usda.gov/"
+        }
+      ],
+      "confidence": "high",
+      "last_reviewed": "2026-07",
+      "kb_version": "1.0"
+    }
+  ]
+}
