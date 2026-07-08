@@ -53,6 +53,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.omnisai.foodscanner
         PRODUCT_NAME: FoodScanner
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Generated/FoodScanner-Info.plist
       properties:
