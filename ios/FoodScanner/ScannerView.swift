@@ -1,112 +1,555 @@
 import AVFoundation
+import CoreImage
 import PhotosUI
 import SwiftUI
 import UIKit
 import Vision
-import VisionKit
 
-/// Barcode scanning via VisionKit DataScannerViewController (first-party, iOS 16+).
-/// See docs/NATIVE_IOS_STACK.md. Vision OCR label fallback lives in
-/// VisionOCR.swift — `captureHandle` is handed the live scanner instance
-/// below so ScanScreen can call `capturePhoto()` on it on demand (see
-/// VisionOCR.swift for why that beats a second AVCaptureSession). Barcode
-/// symbologies/detection/haptics below are unchanged.
+/// Barcode scanning via a custom, fully-owned `AVCaptureSession` pipeline.
+///
+/// **Why not VisionKit's `DataScannerViewController` (the original
+/// implementation):** it has no public zoom API, and `videoZoomFactor` set on
+/// an independently-fetched `AVCaptureDevice` does nothing to its feed —
+/// VisionKit owns its own internal capture session/device and there's no
+/// guarantee (in fact good evidence to the contrary, confirmed on-device)
+/// that an externally grabbed `AVCaptureDevice.default(for: .video)` is even
+/// the same device instance feeding the visible preview. Owning the session
+/// ourselves means the exact `AVCaptureDevice` behind `videoZoomFactor` is
+/// unambiguously the one producing every frame on screen.
+///
+/// See `CameraViewController` below for the capture pipeline itself and
+/// `ScannerCaptureBridge` for how SwiftUI (`ScanOverlay`'s zoom/torch
+/// buttons, `ScanScreen`'s "Snap the label" OCR flow) reaches into it.
+/// `VisionOCR.swift` (unmodified) still does the actual on-device text
+/// recognition — only how it gets fed a still image changes.
 struct ScannerView: UIViewControllerRepresentable {
-    /// Handed the live `DataScannerViewController` once created, so the OCR
-    /// fallback (VisionOCR.swift) can capture a still frame on demand.
-    var captureHandle: ScannerCaptureHandle
+    /// Handed the live `CameraViewController` once created, so `ScanOverlay`
+    /// (zoom/torch) and `ScanScreen` (OCR "Snap the label" capture) can drive
+    /// the exact same capture device/session that's on screen.
+    var captureHandle: ScannerCaptureBridge
     var onBarcode: (String) -> Void
+    /// Fired if camera access is actually denied once we try to use it
+    /// (e.g. the user taps "Don't Allow" on the system prompt while this
+    /// screen is already showing) — lets `ScanScreen` flip to the calm
+    /// permission-denied state without waiting for a `scenePhase` change.
+    var onPermissionDenied: () -> Void
 
-    func makeUIViewController(context: Context) -> DataScannerViewController {
-        let scanner = DataScannerViewController(
-            // Explicit symbology list, not the framework default set — retail
-            // packaging uses EAN-13/EAN-8/UPC-E almost exclusively, with
-            // Code128/39/93 and ITF-14 on shipping/bulk cases, plus QR for
-            // some house brands. Relying on the default set was the likely
-            // cause of "some barcodes scan, some don't".
-            recognizedDataTypes: [
-                .barcode(symbologies: [
-                    .ean13, .ean8, .upce, .code128, .code39, .code93, .itf14, .qr
-                ])
-            ],
-            qualityLevel: .balanced,        // accuracy over speed — small/curved retail codes need this
-            // Multiple items can be in frame at once (shelf, multipack); we
-            // pick the best candidate ourselves in the coordinator rather
-            // than trust "the first thing recognized".
-            recognizesMultipleItems: true,
-            isHighFrameRateTrackingEnabled: true,
-            // We draw our own reticle/lock feedback (ScanOverlay) instead of
-            // VisionKit's built-in per-item highlight boxes, so the two
-            // don't visually compete now that multiple items can be tracked.
-            isHighlightingEnabled: false
-        )
-        scanner.delegate = context.coordinator
-        captureHandle.attach(scanner)
-        // If the user hasn't been asked for camera permission yet, this is the
-        // moment iOS presents the system prompt (DataScannerViewController
-        // handles it — no manual AVCaptureDevice.requestAccess needed).
-        try? scanner.startScanning()
-        return scanner
+    func makeUIViewController(context: Context) -> CameraViewController {
+        let controller = CameraViewController()
+        controller.onBarcode = onBarcode
+        controller.onPermissionDenied = onPermissionDenied
+        captureHandle.attach(controller)
+        return controller
     }
 
-    func updateUIViewController(_ vc: DataScannerViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: CameraViewController, context: Context) {}
+}
 
-    func makeCoordinator() -> Coordinator { Coordinator(onBarcode: onBarcode) }
+/// A `UIView` whose backing `CALayer` *is* an `AVCaptureVideoPreviewLayer`
+/// (Apple's own AVCam sample pattern, via the `layerClass` override). Because
+/// the preview layer is the view's own layer rather than a manually-managed
+/// sublayer, UIKit keeps it sized to the view's bounds automatically on every
+/// layout pass — no `layoutSubviews`/frame-syncing code needed.
+final class CameraPreviewView: UIView {
+    override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
 
-    final class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        let onBarcode: (String) -> Void
-        init(onBarcode: @escaping (String) -> Void) { self.onBarcode = onBarcode }
+    var videoPreviewLayer: AVCaptureVideoPreviewLayer {
+        // Guaranteed by the `layerClass` override above.
+        // swiftlint:disable:next force_cast
+        layer as! AVCaptureVideoPreviewLayer
+    }
+}
 
-        // Fires on every add/update batch. We deliberately don't gate this
-        // with a one-shot "handled" flag: debouncing "one lookup at a time",
-        // and not re-spamming a barcode that just failed, are the
-        // ScanViewModel's job (see blockedBarcode there) — that's what lets
-        // re-aiming at a *different* code work immediately after an error.
-        func dataScanner(_ scanner: DataScannerViewController, didAdd added: [RecognizedItem],
-                         allItems: [RecognizedItem]) {
-            fireBestBarcode(from: allItems, scanner: scanner)
+/// Owns the entire capture pipeline: one `AVCaptureSession` with a single
+/// back-camera input feeding both an `AVCaptureMetadataOutput` (live barcode
+/// detection) and an `AVCapturePhotoOutput` (one-shot stills for the OCR
+/// fallback). Real optical zoom and torch are applied directly to this same
+/// input device, so they always affect exactly what's on screen.
+///
+/// **Threading model:** all session/device mutation (`beginConfiguration`,
+/// `addInput`/`addOutput`, `startRunning`/`stopRunning`, zoom, torch, photo
+/// capture) happens serialized on `sessionQueue`, a private background serial
+/// queue — mirroring Apple's own AVCam sample. `AVCaptureMetadataOutput`'s
+/// delegate callbacks are also delivered on `sessionQueue` (it requires a
+/// serial queue). UI-facing work (reading `videoPreviewLayer.bounds`,
+/// invoking `onBarcode`, resolving the photo-capture continuation, and every
+/// completion closure) is always explicitly hopped back to the main thread —
+/// never assumed. Nothing here blocks the main thread.
+final class CameraViewController: UIViewController {
+    /// Fired (always on main) with the payload of whichever recognized
+    /// barcode is currently closest to the reticle's center — mirrors the
+    /// old `DataScannerViewController` Coordinator's "closest wins" logic.
+    var onBarcode: ((String) -> Void)?
+    /// Fired (always on main) if camera access is denied/restricted.
+    var onPermissionDenied: (() -> Void)?
+
+    private let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "com.foodscanner.scanner.sessionQueue")
+    private let metadataOutput = AVCaptureMetadataOutput()
+    private let photoOutput = AVCapturePhotoOutput()
+    /// Feeds the scan-success "shatter" snapshot (see `captureSnapshotForShatter`).
+    /// A *separate* output from `photoOutput` deliberately: `AVCapturePhotoOutput`
+    /// round-trips through its delegate in ~100-500ms, far too slow for an
+    /// effect that has to appear the instant a barcode locks. Buffering the
+    /// latest live frame here instead gives us that frame essentially for free.
+    private let videoDataOutput = AVCaptureVideoDataOutput()
+    /// Most recent frame from `videoDataOutput`, for the shatter snapshot.
+    /// Written only on `sessionQueue` (the delegate's queue); read only on
+    /// `sessionQueue` (see `captureSnapshotForShatter`) — never touched from
+    /// any other thread, so there's no race on it.
+    private var latestPixelBuffer: CVPixelBuffer?
+    /// Reused across snapshot conversions — Apple recommends against
+    /// creating a fresh `CIContext` per call (it's the expensive part).
+    private let ciContext = CIContext()
+
+    /// The exact `AVCaptureDevice` behind the session's video input — the
+    /// single source of truth for zoom/torch, and for the OCR still capture.
+    /// Written only on `sessionQueue`; read only on `sessionQueue` (zoom/
+    /// torch/capture) so there's never a cross-thread race on it.
+    private var videoDevice: AVCaptureDevice?
+    /// Guards against configuring the session twice (e.g. if `viewWillAppear`
+    /// runs again before an async permission prompt resolves). Read/written
+    /// only on `sessionQueue`.
+    private var isConfigured = false
+    /// The in-flight "Snap the label" photo capture, if any. Read/written
+    /// only on `sessionQueue` — including from the `AVCapturePhotoCaptureDelegate`
+    /// callback, which is hopped onto `sessionQueue` for exactly this reason
+    /// (its delivery queue is otherwise unspecified/arbitrary per Apple's docs).
+    private var photoCaptureContinuation: CheckedContinuation<UIImage, Error>?
+
+    private static let zoomSteps: [CGFloat] = [1.0, 2.0, 3.0]
+    /// Index into `zoomSteps` for the *next* tap — read/written only on
+    /// `sessionQueue`.
+    private var zoomIndex = 0
+
+    private var previewView: CameraPreviewView { view as! CameraPreviewView }
+
+    override func loadView() {
+        view = CameraPreviewView()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Wiring the session onto the preview layer is cheap/UI-only and can
+        // happen immediately on main; the actual input/output configuration
+        // below is dispatched off-main since it can briefly block on
+        // hardware (Apple explicitly calls this out for session setup).
+        previewView.videoPreviewLayer.videoGravity = .resizeAspectFill
+        previewView.videoPreviewLayer.session = session
+        sessionQueue.async { [weak self] in
+            self?.configureSessionIfNeeded()
         }
+    }
 
-        // With recognizesMultipleItems enabled, items already in frame keep
-        // reporting updates (bounds move as the phone/product moves) — this
-        // is what lets us continuously prefer whichever barcode is currently
-        // most centered, not just whichever was recognized first.
-        func dataScanner(_ scanner: DataScannerViewController, didUpdate updated: [RecognizedItem],
-                         allItems: [RecognizedItem]) {
-            fireBestBarcode(from: allItems, scanner: scanner)
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        sessionQueue.async { [weak self] in
+            self?.configureSessionIfNeeded()
         }
+    }
 
-        private func fireBestBarcode(from items: [RecognizedItem], scanner: DataScannerViewController) {
-            let center = CGPoint(x: scanner.view.bounds.midX, y: scanner.view.bounds.midY)
-            guard let payload = bestBarcode(among: items, centeredOn: center) else { return }
-            onBarcode(payload)
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        sessionQueue.async { [weak self] in
+            guard let self, self.session.isRunning else { return }
+            self.session.stopRunning()
         }
+    }
 
-        /// Picks the recognized barcode closest to the given point, ignoring
-        /// non-barcode items (e.g. text) and barcodes VisionKit couldn't
-        /// decode a payload for.
-        private func bestBarcode(among items: [RecognizedItem], centeredOn center: CGPoint) -> String? {
-            var bestPayload: String?
-            var bestDistanceSquared = CGFloat.greatestFiniteMagnitude
+    // MARK: - Session configuration (sessionQueue only)
 
-            for item in items {
-                guard case let .barcode(barcode) = item, let payload = barcode.payloadStringValue else { continue }
-                let bounds = item.bounds
-                let itemCenter = CGPoint(
-                    x: (bounds.topLeft.x + bounds.topRight.x + bounds.bottomLeft.x + bounds.bottomRight.x) / 4,
-                    y: (bounds.topLeft.y + bounds.topRight.y + bounds.bottomLeft.y + bounds.bottomRight.y) / 4
-                )
-                let dx = itemCenter.x - center.x
-                let dy = itemCenter.y - center.y
-                let distanceSquared = dx * dx + dy * dy
-                if distanceSquared < bestDistanceSquared {
-                    bestDistanceSquared = distanceSquared
-                    bestPayload = payload
+    /// Idempotent: safe to call from both `viewDidLoad` and `viewWillAppear`
+    /// without double-configuring. If permission is still undetermined the
+    /// first call kicks off the system prompt and configuration finishes
+    /// later, on `sessionQueue`, once the user responds.
+    private func configureSessionIfNeeded() {
+        guard !isConfigured else {
+            if !session.isRunning { session.startRunning() }
+            return
+        }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            setUpSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                guard let self else { return }
+                self.sessionQueue.async {
+                    if granted {
+                        self.setUpSession()
+                    } else {
+                        self.notifyPermissionDenied()
+                    }
                 }
             }
-            return bestPayload
+        case .denied, .restricted:
+            notifyPermissionDenied()
+        @unknown default:
+            notifyPermissionDenied()
         }
     }
+
+    /// Must only run on `sessionQueue`. Picks the best available back
+    /// camera, wires it into the session alongside metadata + photo outputs,
+    /// and starts the session running.
+    private func setUpSession() {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        session.sessionPreset = .photo // recommended preset when the session includes an AVCapturePhotoOutput
+
+        guard let device = Self.bestBackVideoDevice() else {
+            // ScanScreen already gates entry into this screen on
+            // `CameraAvailability.current` finding a video device, so this
+            // is a defensive no-op path in practice, not a real user-facing case.
+            return
+        }
+
+        let input: AVCaptureDeviceInput
+        do {
+            input = try AVCaptureDeviceInput(device: device)
+        } catch {
+            return
+        }
+        guard session.canAddInput(input) else { return }
+        session.addInput(input)
+        videoDevice = device
+
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
+            metadataOutput.setMetadataObjectsDelegate(self, queue: sessionQueue)
+            // Read *after* addInput+addOutput so it reflects this device's
+            // real support, then filter our desired retail set against it —
+            // AVCaptureMetadataOutput throws (NSInvalidArgumentException) if
+            // you assign a type outside `availableMetadataObjectTypes`, so
+            // this filter isn't optional defensiveness, it's required safety.
+            let desired: [AVMetadataObject.ObjectType] = [
+                .ean13, .ean8, .upce, .code128, .code39, .code93, .itf14, .qr, .pdf417, .aztec
+            ]
+            let available = metadataOutput.availableMetadataObjectTypes
+            metadataOutput.metadataObjectTypes = desired.filter { available.contains($0) }
+        }
+
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        }
+
+        if session.canAddOutput(videoDataOutput) {
+            session.addOutput(videoDataOutput)
+            videoDataOutput.alwaysDiscardsLateVideoFrames = true
+            videoDataOutput.setSampleBufferDelegate(self, queue: sessionQueue)
+            // Raw sample buffers come off the sensor in its native (landscape)
+            // orientation — unlike AVCaptureVideoPreviewLayer, this output has
+            // no built-in "just display it right-side up" behavior, so this
+            // screen being portrait-only, we rotate the connection itself.
+            // (`videoOrientation` is soft-deprecated in iOS 17 in favor of
+            // `videoRotationAngle`, but still fully functional; used here
+            // deliberately since its `.portrait` case is unambiguous, vs.
+            // guessing the replacement API's exact rotation-angle convention
+            // untested.)
+            if let connection = videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
+        }
+
+        isConfigured = true
+        if !session.isRunning { session.startRunning() }
+    }
+
+    private func notifyPermissionDenied() {
+        DispatchQueue.main.async { [weak self] in self?.onPermissionDenied?() }
+    }
+
+    /// Best available back camera, preferring a multi-lens *virtual* device
+    /// (triple/dual/dual-wide) over the single wide lens. This is the part
+    /// that makes zoom **real optical zoom** rather than a digital crop: a
+    /// virtual multi-camera device seamlessly switches physical lenses as
+    /// `videoZoomFactor` crosses each lens's switchover point, whereas
+    /// driving `.builtInWideAngleCamera` alone can only ever crop/upscale
+    /// the wide sensor. On hardware with just one rear lens (e.g. iPhone
+    /// SE), this correctly falls back to `.builtInWideAngleCamera` and zoom
+    /// there is honestly digital — there's no second lens to switch to.
+    private static func bestBackVideoDevice() -> AVCaptureDevice? {
+        let candidateTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInTripleCamera,
+            .builtInDualCamera,
+            .builtInDualWideCamera,
+            .builtInWideAngleCamera
+        ]
+        for type in candidateTypes {
+            if let device = AVCaptureDevice.default(type, for: .video, position: .back) {
+                return device
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Zoom / torch (sessionQueue only; completions hop back to main)
+
+    /// Cycles 1x -> 2x -> 3x -> 1x on `videoDevice`, clamped to what the
+    /// device actually supports. `completion` always fires on main with the
+    /// factor that was actually applied (post-clamp), so the UI label never
+    /// claims a zoom level the hardware didn't honor.
+    func cycleZoom(completion: @escaping (CGFloat) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.videoDevice else {
+                DispatchQueue.main.async { completion(1.0) }
+                return
+            }
+            self.zoomIndex = (self.zoomIndex + 1) % Self.zoomSteps.count
+            let requested = Self.zoomSteps[self.zoomIndex]
+            let clamped = min(max(requested, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = clamped
+                device.unlockForConfiguration()
+            } catch {
+                // Device busy/unavailable — report whatever the hardware is
+                // actually at below; the button stays tappable to retry.
+            }
+            let applied = device.videoZoomFactor
+            DispatchQueue.main.async { completion(applied) }
+        }
+    }
+
+    /// Resets zoom to 1x — used when leaving Scan so the camera never stays
+    /// zoomed in for the next visit.
+    func resetZoom(completion: @escaping (CGFloat) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.videoDevice else {
+                DispatchQueue.main.async { completion(1.0) }
+                return
+            }
+            self.zoomIndex = 0
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = 1.0
+                device.unlockForConfiguration()
+            } catch {
+                // Leave hardware zoom as-is; report its actual current value below.
+            }
+            DispatchQueue.main.async { completion(device.videoZoomFactor) }
+        }
+    }
+
+    /// Sets torch on/off on the same device; `completion` reports the
+    /// resulting state on main.
+    func setTorch(on: Bool, completion: @escaping (Bool) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.videoDevice, device.hasTorch else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            do {
+                try device.lockForConfiguration()
+                device.torchMode = on ? .on : .off
+                device.unlockForConfiguration()
+            } catch {
+                // Device busy/unavailable — report actual current state below.
+            }
+            DispatchQueue.main.async { completion(device.torchMode == .on) }
+        }
+    }
+
+    // MARK: - Still capture (OCR "Snap the label")
+
+    /// Captures one full-resolution still frame from the live session for
+    /// `VisionOCR.recognizeText(in:)`. Bridges `AVCapturePhotoOutput`'s
+    /// delegate-based API to async/await; only one capture may be in flight
+    /// at a time.
+    func capturePhoto() async throws -> UIImage {
+        try await withCheckedThrowingContinuation { continuation in
+            sessionQueue.async { [weak self] in
+                guard let self, self.isConfigured, self.photoCaptureContinuation == nil else {
+                    continuation.resume(throwing: VisionOCRError.scannerUnavailable)
+                    return
+                }
+                self.photoCaptureContinuation = continuation
+                self.photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+            }
+        }
+    }
+
+    // MARK: - Scan-success "shatter" snapshot
+
+    /// Converts the most recently buffered live frame into a `UIImage` for
+    /// the shatter transition. Asynchronous but cheap (no camera round-trip —
+    /// just converting a frame we're already holding); `completion` always
+    /// fires on main. Never fails loudly: a `nil` image just means
+    /// `ShatterOverlay` has nothing to shatter, so it silently no-ops (this
+    /// is a visual flourish, never allowed to affect the lookup it rides
+    /// alongside).
+    func captureSnapshotForShatter(completion: @escaping (UIImage?) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let pixelBuffer = self.latestPixelBuffer else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+            guard let cgImage = self.ciContext.createCGImage(ciImage, from: ciImage.extent) else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let image = UIImage(cgImage: cgImage)
+            DispatchQueue.main.async { completion(image) }
+        }
+    }
+}
+
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+
+extension CameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
+    /// Fires on `sessionQueue` (the delegate queue set above) for every
+    /// frame; just buffers the latest one for `captureSnapshotForShatter` to
+    /// pick up on demand — no per-frame work beyond a reference store.
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
+                        from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        latestPixelBuffer = pixelBuffer
+    }
+}
+
+// MARK: - AVCaptureMetadataOutputObjectsDelegate
+
+extension CameraViewController: AVCaptureMetadataOutputObjectsDelegate {
+    /// Fires on `sessionQueue` for every processed frame that contains at
+    /// least one recognized metadata object.
+    func metadataOutput(_ output: AVCaptureMetadataOutput,
+                         didOutput metadataObjects: [AVMetadataObject],
+                         from connection: AVCaptureConnection) {
+        guard !metadataObjects.isEmpty else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.fireBestBarcode(from: metadataObjects)
+        }
+    }
+
+    /// Picks the recognized barcode closest to the reticle's center — same
+    /// "closest wins" behavior the previous `DataScannerViewController`
+    /// Coordinator had, adapted to `AVMetadataMachineReadableCodeObject` +
+    /// `transformedMetadataObject(for:)` (which maps the metadata output's
+    /// coordinate space into the preview layer's, i.e. view/screen points).
+    /// Always called on main (see the delegate method above).
+    private func fireBestBarcode(from metadataObjects: [AVMetadataObject]) {
+        let previewLayer = previewView.videoPreviewLayer
+        let center = CGPoint(x: previewLayer.bounds.midX, y: previewLayer.bounds.midY)
+        var bestPayload: String?
+        var bestDistanceSquared = CGFloat.greatestFiniteMagnitude
+
+        for object in metadataObjects {
+            guard let code = object as? AVMetadataMachineReadableCodeObject,
+                  let payload = code.stringValue,
+                  let transformed = previewLayer.transformedMetadataObject(for: code) else { continue }
+            let bounds = transformed.bounds
+            let itemCenter = CGPoint(x: bounds.midX, y: bounds.midY)
+            let dx = itemCenter.x - center.x
+            let dy = itemCenter.y - center.y
+            let distanceSquared = dx * dx + dy * dy
+            if distanceSquared < bestDistanceSquared {
+                bestDistanceSquared = distanceSquared
+                bestPayload = payload
+            }
+        }
+        if let bestPayload {
+            onBarcode?(bestPayload)
+        }
+    }
+}
+
+// MARK: - AVCapturePhotoCaptureDelegate
+
+extension CameraViewController: AVCapturePhotoCaptureDelegate {
+    func photoOutput(_ output: AVCapturePhotoOutput,
+                      didFinishProcessingPhoto photo: AVCapturePhoto,
+                      error: Error?) {
+        // Delivery queue for this callback is unspecified/arbitrary per
+        // Apple's docs — hop onto sessionQueue before touching
+        // `photoCaptureContinuation`, the same queue that writes it in
+        // `capturePhoto()`, so there's never a cross-thread race on it.
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let continuation = self.photoCaptureContinuation
+            self.photoCaptureContinuation = nil
+            if let error {
+                continuation?.resume(throwing: error)
+            } else if let data = photo.fileDataRepresentation(), let image = UIImage(data: data) {
+                continuation?.resume(returning: image)
+            } else {
+                continuation?.resume(throwing: VisionOCRError.invalidImage)
+            }
+        }
+    }
+}
+
+/// Bridges SwiftUI (`ScanOverlay`'s zoom/torch buttons, `ScanScreen`'s "Snap
+/// the label" flow) to the live `CameraViewController` so every one of those
+/// actions operates on the *exact* `AVCaptureDevice`/session actually
+/// producing the visible preview.
+///
+/// Supersedes `ScannerCaptureHandle` in `VisionOCR.swift`, which was written
+/// against `DataScannerViewController.capturePhoto()` and has no caller now
+/// that this feature owns a custom `AVCaptureSession` — left in place there
+/// since file ownership for this change is `ScannerView.swift` +
+/// `ScanOverlay.swift` only.
+final class ScannerCaptureBridge {
+    private weak var controller: CameraViewController?
+
+    /// Whether the back camera reports a torch/flash unit — a read-only
+    /// capability check, safe to query independently of exactly which back
+    /// camera type (wide/dual/triple) ends up in use, since the torch is a
+    /// single shared flash unit on the device.
+    var hasTorch: Bool { AVCaptureDevice.default(for: .video)?.hasTorch ?? false }
+
+    /// Called once by `ScannerView.makeUIViewController`.
+    func attach(_ controller: CameraViewController) {
+        self.controller = controller
+    }
+
+    /// Captures a still frame from the live session and runs on-device
+    /// Vision text recognition on it (`VisionOCR.swift`) — same OCR fallback
+    /// flow as before, just fed by our own `AVCapturePhotoOutput` instead of
+    /// `DataScannerViewController.capturePhoto()`.
+    @MainActor
+    func captureLabelText() async throws -> String? {
+        guard let controller else { throw VisionOCRError.scannerUnavailable }
+        let image = try await controller.capturePhoto()
+        return try await VisionOCR.recognizeText(in: image)
+    }
+
+    /// Cycles 1x -> 2x -> 3x on the live device; `completion` always fires on main.
+    func cycleZoom(completion: @escaping (CGFloat) -> Void) {
+        guard let controller else { completion(1.0); return }
+        controller.cycleZoom(completion: completion)
+    }
+
+    /// Resets zoom to 1x; `completion` always fires on main.
+    func resetZoom(completion: @escaping (CGFloat) -> Void) {
+        guard let controller else { completion(1.0); return }
+        controller.resetZoom(completion: completion)
+    }
+
+    /// Sets torch on/off; `completion` always fires on main.
+    func setTorch(on: Bool, completion: @escaping (Bool) -> Void) {
+        guard let controller else { completion(false); return }
+        controller.setTorch(on: on, completion: completion)
+    }
+
+    /// Grabs the live preview's most recent frame for the scan-success
+    /// "shatter" transition (`ShatterOverlay` in ScanOverlay.swift);
+    /// `completion` always fires on main.
+    func captureSnapshotForShatter(completion: @escaping (UIImage?) -> Void) {
+        guard let controller else { completion(nil); return }
+        controller.captureSnapshotForShatter(completion: completion)
+    }
+}
+
+/// One "a barcode just locked" moment for `ShatterOverlay` to animate. Each
+/// instance carries a fresh `id` (even if two events happen to share the
+/// same/`nil` image) so SwiftUI's `.onChange(of:)` reliably fires every time
+/// — `Equatable` is implemented over `id` alone since `UIImage` itself isn't
+/// `Equatable`.
+struct ScanShatterEvent: Equatable {
+    let id = UUID()
+    let image: UIImage?
+
+    static func == (lhs: ScanShatterEvent, rhs: ScanShatterEvent) -> Bool { lhs.id == rhs.id }
 }
 
 /// One barcode lookup at a time; drives the calm loading/error/needs-OCR
@@ -129,6 +572,10 @@ final class ScanViewModel {
     private(set) var phase: Phase = .scanning
     var product: Product?
     var showProduct = false
+    /// The most recent "barcode just locked" moment, for `ShatterOverlay`.
+    /// See `ScanShatterEvent` — a fresh value every time, even back-to-back,
+    /// so the animation reliably re-triggers.
+    private(set) var shatterEvent: ScanShatterEvent?
 
     private var isLookingUp = false
     // The last barcode that resulted in an error/needsOCR, so a stationary
@@ -145,7 +592,8 @@ final class ScanViewModel {
     }
 
     @MainActor
-    func handle(barcode: String, api: APIClient, pantryService: PantryService) async {
+    func handle(barcode: String, api: APIClient, pantryService: PantryService,
+                captureHandle: ScannerCaptureBridge) async {
         guard !isLookingUp, !showProduct else { return }   // one lookup at a time; ignore while navigating away
         guard barcode != blockedBarcode else { return }    // don't spam-retry a code that just failed
         isLookingUp = true
@@ -157,6 +605,12 @@ final class ScanViewModel {
         // is what locks the reticle solid in ScanOverlay.
         feedback.notificationOccurred(.success)
         phase = .lookingUp
+        // Fire-and-forget: grabbing + publishing the shatter snapshot is a
+        // purely visual flourish (ScanOverlay's ShatterOverlay) and must
+        // never gate or delay the actual lookup below.
+        captureHandle.captureSnapshotForShatter { [weak self] image in
+            self?.shatterEvent = ScanShatterEvent(image: image)
+        }
         await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService)
     }
 
@@ -193,7 +647,7 @@ final class ScanViewModel {
     /// provisional-scoring endpoint a barcode lookup would use. Reuses
     /// `isLookingUp` so a capture and a barcode lookup can never race.
     @MainActor
-    func captureLabel(handle: ScannerCaptureHandle, api: APIClient, pantryService: PantryService) async {
+    func captureLabel(handle: ScannerCaptureBridge, api: APIClient, pantryService: PantryService) async {
         guard !isLookingUp, !showProduct else { return }
         isLookingUp = true
         defer { isLookingUp = false }
@@ -293,15 +747,16 @@ final class ScanViewModel {
         phase = .scanning
         product = nil
         blockedBarcode = nil
+        shatterEvent = nil
         feedback.prepare()
     }
 }
 
 /// Vision's barcode detector run once against a still image from the photo
 /// library (gallery fallback), using the same symbology list as the live
-/// `DataScannerViewController` above so a picked photo can be routed through
-/// the exact same barcode lookup path as a live scan. Deliberately separate
-/// from VisionOCR.swift's text-recognition helper (different Vision request
+/// scanner above so a picked photo can be routed through the exact same
+/// barcode lookup path as a live scan. Deliberately separate from
+/// VisionOCR.swift's text-recognition helper (different Vision request
 /// type; kept here since this feature's file ownership is ScanOverlay.swift +
 /// ScannerView.swift only).
 private enum GalleryBarcodeDetector {
@@ -354,18 +809,18 @@ private extension CGImagePropertyOrientation {
 /// so we can show the right calm state (docs/DESIGN_SYSTEM.md §5.9) instead of
 /// a blank camera view.
 private enum CameraAvailability: Equatable {
-    case ready              // supported, and not explicitly denied — DataScannerViewController
-                             // will prompt for permission itself if it's still undetermined.
+    case ready              // supported, and not explicitly denied — CameraViewController
+                             // requests permission itself if it's still undetermined.
     case unsupportedDevice  // no camera / unsupported hardware (e.g. Simulator).
     case permissionDenied   // user previously said no — only Settings can fix this.
 
     @MainActor
     static var current: CameraAvailability {
-        guard DataScannerViewController.isSupported else { return .unsupportedDevice }
+        guard AVCaptureDevice.default(for: .video) != nil else { return .unsupportedDevice }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .denied || status == .restricted { return .permissionDenied }
-        // .notDetermined or .authorized — DataScannerViewController prompts
-        // for permission itself the first time scanning starts.
+        // .notDetermined or .authorized — CameraViewController prompts for
+        // permission itself the first time it configures the session.
         return .ready
     }
 }
@@ -378,9 +833,10 @@ struct ScanScreen: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var vm = ScanViewModel()
-    // Handed to ScannerView so it can attach the live DataScannerViewController;
-    // ScanScreen uses it to trigger an on-demand OCR capture (VisionOCR.swift).
-    @State private var captureHandle = ScannerCaptureHandle()
+    // Handed to ScannerView so it can attach the live CameraViewController;
+    // ScanScreen/ScanOverlay use it to drive zoom/torch and to trigger an
+    // on-demand OCR capture (VisionOCR.swift).
+    @State private var captureHandle = ScannerCaptureBridge()
     // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
     // and @State default values are evaluated outside the main actor).
     @State private var availability = CameraAvailability.ready
@@ -435,12 +891,17 @@ struct ScanScreen: View {
 
     private var scannerBody: some View {
         ZStack {
-            ScannerView(captureHandle: captureHandle) { code in
-                Task { await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService) }
-            }
+            ScannerView(captureHandle: captureHandle, onBarcode: { code in
+                Task {
+                    await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService,
+                                     captureHandle: captureHandle)
+                }
+            }, onPermissionDenied: {
+                availability = .permissionDenied
+            })
             .ignoresSafeArea()
 
-            ScanOverlay(phase: vm.phase) { item in
+            ScanOverlay(phase: vm.phase, captureHandle: captureHandle, shatterEvent: vm.shatterEvent) { item in
                 Task {
                     await vm.analyzeGalleryPhoto(item, api: APIClient(session: session), pantryService: pantryService)
                 }

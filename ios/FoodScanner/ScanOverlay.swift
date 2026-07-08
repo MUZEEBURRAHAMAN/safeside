@@ -1,21 +1,35 @@
-import AVFoundation
 import PhotosUI
 import SwiftUI
+import UIKit
 
-/// Aim guidance drawn above the live `DataScannerViewController` feed
-/// (docs/DESIGN_SYSTEM_V3.md §5.9 — "the dark brand moment"): a centered,
-/// brand-green corner-bracket reticle that locks solid the instant a barcode
-/// is caught, a dimmed surround so users know where to point the camera, a
-/// top instruction pill, and a trailing-edge control cluster (zoom / gallery /
-/// torch — see `controlCluster` below) for low light and photo-library scans.
+/// Aim guidance drawn above the live camera feed (`ScannerView`'s
+/// `CameraViewController`) — docs/DESIGN_SYSTEM_V3.md §5.9 ("the dark brand
+/// moment"): a centered, brand-green corner-bracket reticle that locks solid
+/// the instant a barcode is caught, a dimmed surround so users know where to
+/// point the camera, a top instruction pill, a trailing-edge control cluster
+/// (zoom / gallery / torch — see `controlCluster` below), and the scan-success
+/// "shatter" flourish (see `ShatterOverlay`).
+///
+/// Zoom and torch are driven through `captureHandle` (`ScannerCaptureBridge`)
+/// rather than grabbing an independent `AVCaptureDevice` — that's the fix for
+/// "zoom doesn't work": the old code queried an unrelated default video
+/// device that had nothing to do with whatever session was actually feeding
+/// the screen. Going through the bridge guarantees we're driving the *same*
+/// device/session as `ScannerView`'s live preview.
+///
 /// Lime is used only as the small "spark" accent on this dark surface (the
-/// sweep line) — the reticle itself and the lock state both stay brand green,
-/// per spec.
+/// sweep line, the shatter flash) — the reticle itself and the lock state
+/// both stay brand green, per spec.
 ///
 /// Purely visual/feedback — the scanner underneath keeps running through
 /// every phase, so a re-aim after an error or "not found" always works.
 struct ScanOverlay: View {
     let phase: ScanViewModel.Phase
+    /// Bridges to the live `CameraViewController` for zoom/torch — see the
+    /// type header above.
+    let captureHandle: ScannerCaptureBridge
+    /// A fresh value each time a barcode locks; drives `ShatterOverlay`.
+    let shatterEvent: ScanShatterEvent?
     /// Fired the instant the user picks a photo from `PhotosPicker` — the
     /// caller (`ScanScreen`) owns everything past that point (loading the
     /// image, running Vision, hitting the backend) via `ScanViewModel`.
@@ -24,11 +38,13 @@ struct ScanOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sweepOffset: CGFloat = 0
     @State private var torchOn = false
-    @State private var isZoomedIn = false
+    /// The zoom factor currently *applied* to the live device (post-clamp) —
+    /// not just "did the user tap zoom," so the button label never claims a
+    /// level the hardware didn't actually honor. Cycles 1x -> 2x -> 3x -> 1x.
+    @State private var zoomFactor: CGFloat = 1.0
     @State private var selectedPhotoItem: PhotosPickerItem?
 
     private let reticleSize: CGFloat = 240
-    private let hasTorch = AVCaptureDevice.default(for: .video)?.hasTorch ?? false
 
     private var isLocked: Bool { phase == .lookingUp }
     // The lookingUp/error/needsOCR states already surface their own text via
@@ -69,12 +85,19 @@ struct ScanOverlay: View {
                         .padding(.trailing, proxy.safeAreaInsets.trailing + Theme.Space.s4)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
+
+                // On top of everything else in this overlay — the "whole
+                // screen freezes and breaks apart" moment reads correctly
+                // only above the reticle/dimming/instruction chrome.
+                ShatterOverlay(event: shatterEvent)
             }
         }
         .onAppear { startSweepIfNeeded() }
         .onDisappear {
-            if torchOn { toggleTorch() }   // never leave the flashlight on after leaving Scan
-            if isZoomedIn { toggleZoom() } // ...or the camera zoomed in
+            // Never leave the flashlight on, or the camera zoomed in, after
+            // leaving Scan.
+            if torchOn { captureHandle.setTorch(on: false) { torchOn = $0 } }
+            if zoomFactor != 1.0 { captureHandle.resetZoom { zoomFactor = $0 } }
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let newItem else { return }
@@ -170,14 +193,14 @@ struct ScanOverlay: View {
 
     /// A dark, vertically-stacked pill of three 44×44pt controls, matching
     /// the iOS Camera app's trailing-edge control convention. Torch only
-    /// appears when the device actually has one (`hasTorch`); zoom and
-    /// gallery are always available.
+    /// appears when the device actually has one (`captureHandle.hasTorch`);
+    /// zoom and gallery are always available.
     private var controlCluster: some View {
         VStack(spacing: 0) {
             zoomButton
             clusterDivider
             galleryButton
-            if hasTorch {
+            if captureHandle.hasTorch {
                 clusterDivider
                 torchButton
             }
@@ -193,17 +216,19 @@ struct ScanOverlay: View {
             .frame(width: 24, height: 1)
     }
 
-    /// "1×" / "2×" toggle — see `toggleZoom()` for the device-level
-    /// `videoZoomFactor` trick (same pattern as `toggleTorch()` below).
+    /// "1×" / "2×" / "3×" cycle — see `CameraViewController.cycleZoom` for
+    /// the real-optical-zoom device-level implementation (same completion-
+    /// handler pattern as `toggleTorch()` below, since the actual device
+    /// mutation now happens on the capture session's background queue).
     private var zoomButton: some View {
-        Button(action: toggleZoom) {
-            Text(isZoomedIn ? "2×" : "1×")
+        Button(action: cycleZoom) {
+            Text(zoomLabel(zoomFactor))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.onGreen)
                 .frame(width: 44, height: 44)
         }
-        .accessibilityLabel("Zoom, currently \(isZoomedIn ? "2x" : "1x")")
-        .accessibilityHint("Double tap to switch to \(isZoomedIn ? "1x" : "2x") zoom.")
+        .accessibilityLabel("Zoom, currently \(zoomLabel(zoomFactor))")
+        .accessibilityHint("Double tap to cycle to the next zoom level.")
     }
 
     /// Presents the system photo picker; the actual scan (barcode-first,
@@ -232,47 +257,25 @@ struct ScanOverlay: View {
     }
 
     private func toggleTorch() {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
-        do {
-            try device.lockForConfiguration()
-            device.torchMode = device.torchMode == .on ? .off : .on
-            torchOn = device.torchMode == .on
-            device.unlockForConfiguration()
-        } catch {
-            // Device busy/unavailable — leave state as-is; button stays tappable to retry.
+        captureHandle.setTorch(on: !torchOn) { isOn in
+            torchOn = isOn
         }
     }
 
-    /// Same device-level trick as `toggleTorch()` — `DataScannerViewController`
-    /// owns the capture session, but `videoZoomFactor` is a property of the
-    /// underlying `AVCaptureDevice`, which we can still reach directly.
-    /// Clamps to `maxAvailableVideoZoomFactor` and degrades gracefully (label
-    /// stays "1×") if the device can't zoom or the config lock fails.
-    private func toggleZoom() {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
-
-        if isZoomedIn {
-            do {
-                try device.lockForConfiguration()
-                device.videoZoomFactor = 1.0
-                device.unlockForConfiguration()
-                isZoomedIn = false
-            } catch {
-                // Leave state as-is; button stays tappable to retry.
-            }
-            return
+    private func cycleZoom() {
+        captureHandle.cycleZoom { factor in
+            zoomFactor = factor
         }
+    }
 
-        let target = min(2.0, device.maxAvailableVideoZoomFactor)
-        guard target > 1.0 else { return } // device can't zoom past 1x — stay at 1x
-        do {
-            try device.lockForConfiguration()
-            device.videoZoomFactor = target
-            device.unlockForConfiguration()
-            isZoomedIn = true
-        } catch {
-            // Leave state as-is; label stays "1×".
+    /// Compact "1×"/"2×"/"3×" label for a whole-number factor, or "2.5×"-style
+    /// one decimal place for whatever a device's `maxAvailableVideoZoomFactor`
+    /// clamp lands on (e.g. a device whose optical range tops out below 3x).
+    private func zoomLabel(_ factor: CGFloat) -> String {
+        if factor.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(factor))×"
         }
+        return String(format: "%.1f×", factor)
     }
 }
 
@@ -301,5 +304,152 @@ private struct ReticleCorners: Shape {
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cornerLength))
         return path
+    }
+}
+
+/// One grid piece of a `ShatterOverlay` snapshot — see `ShatterOverlay.makeShards`.
+private struct Shard: Identifiable {
+    let id: Int
+    let image: UIImage
+    /// This shard's center within the full snapshot, normalized 0...1 —
+    /// multiplied by the overlay's actual on-screen size to place it.
+    let unitCenter: CGPoint
+    /// This shard's size within the full snapshot, normalized 0...1.
+    let unitSize: CGSize
+    /// A small per-shard rotation (degrees), applied in full at `progress ==
+    /// 1`, purely for visual variety so pieces don't fly dead-straight and
+    /// identically outward.
+    let rotation: Double
+}
+
+/// Scan-success "shatter" transition: the instant a barcode locks,
+/// `ScanViewModel` hands us a frozen snapshot of the live preview (see
+/// `CameraViewController.captureSnapshotForShatter`); this view slices it
+/// into a grid and animates the pieces flying outward + fading, revealing the
+/// live feed underneath again as the lookup proceeds — a brief (~0.45s)
+/// ease-out flourish riding alongside the existing success haptic + green
+/// reticle lock, never gating them or the lookup itself (`ScanViewModel`
+/// fires the snapshot capture fire-and-forget).
+///
+/// **Reduce Motion:** no flying shards at all — a single quick, calm
+/// lime flash stands in, matching this brand's one "spark" accent.
+private struct ShatterOverlay: View {
+    /// A new (non-`nil`, non-equal) value fires the animation.
+    let event: ScanShatterEvent?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shards: [Shard] = []
+    @State private var progress: CGFloat = 0
+    @State private var flashOpacity: Double = 0
+    @State private var isPlaying = false
+
+    private static let columns = 5
+    private static let rows = 8
+    private static let duration = 0.45
+    /// How far a shard at the very edge of the frame travels outward, in
+    /// points, at `progress == 1`. Shards nearer the center travel
+    /// proportionally less (see `offset(for:)`), which is what reads as an
+    /// "explosion from the middle" rather than a uniform slide.
+    private static let maxOutwardDistance: CGFloat = 140
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                if reduceMotion {
+                    Rectangle()
+                        .fill(Theme.lime)
+                        .opacity(flashOpacity)
+                        .allowsHitTesting(false)
+                } else {
+                    ForEach(shards) { shard in
+                        let offset = offset(for: shard)
+                        Image(uiImage: shard.image)
+                            .resizable()
+                            .frame(
+                                width: shard.unitSize.width * proxy.size.width,
+                                height: shard.unitSize.height * proxy.size.height
+                            )
+                            .position(
+                                x: shard.unitCenter.x * proxy.size.width + offset.dx,
+                                y: shard.unitCenter.y * proxy.size.height + offset.dy
+                            )
+                            .rotationEffect(.degrees(shard.rotation * progress))
+                            .opacity(1 - progress)
+                    }
+                }
+            }
+            .allowsHitTesting(false)
+            .onChange(of: event) { _, newEvent in
+                guard let newEvent else { return }
+                play(with: newEvent)
+            }
+        }
+    }
+
+    /// Outward displacement for one shard at the current `progress`, scaled
+    /// by how far this shard's center already sits from the frame's own
+    /// center (0 at dead-center, up to `maxOutwardDistance` at the edges).
+    private func offset(for shard: Shard) -> (dx: CGFloat, dy: CGFloat) {
+        let dx = shard.unitCenter.x - 0.5
+        let dy = shard.unitCenter.y - 0.5
+        return (dx * 2 * Self.maxOutwardDistance * progress, dy * 2 * Self.maxOutwardDistance * progress)
+    }
+
+    private func play(with event: ScanShatterEvent) {
+        if reduceMotion {
+            flashOpacity = 0.35
+            withAnimation(.easeOut(duration: 0.2)) { flashOpacity = 0 }
+            return
+        }
+        guard let image = event.image, !isPlaying else { return }
+        isPlaying = true
+        shards = Self.makeShards(from: image, columns: Self.columns, rows: Self.rows)
+        progress = 0
+        // A dedicated ease-out, no-bounce duration for this specific
+        // flourish (Motion.swift's presets top out at 0.28s) — kept local
+        // since only ScanOverlay.swift is in scope for this feature; the
+        // easing/no-bounce character still matches DesignKit's Motion
+        // language in spirit.
+        withAnimation(.easeOut(duration: Self.duration)) {
+            progress = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.duration) {
+            shards = []
+            progress = 0
+            isPlaying = false
+        }
+    }
+
+    /// Slices `image` into a `columns` x `rows` grid of independent `UIImage`
+    /// pieces (each with its own normalized center/size so they can be laid
+    /// out and animated independently regardless of the overlay's actual
+    /// on-screen size).
+    private static func makeShards(from image: UIImage, columns: Int, rows: Int) -> [Shard] {
+        guard let cgImage = image.cgImage else { return [] }
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        guard width > 0, height > 0 else { return [] }
+        let tileWidth = width / CGFloat(columns)
+        let tileHeight = height / CGFloat(rows)
+
+        var shards: [Shard] = []
+        var id = 0
+        for row in 0..<rows {
+            for col in 0..<columns {
+                let rect = CGRect(x: CGFloat(col) * tileWidth, y: CGFloat(row) * tileHeight,
+                                   width: tileWidth, height: tileHeight)
+                guard let cropped = cgImage.cropping(to: rect) else { continue }
+                let unitCenter = CGPoint(x: rect.midX / width, y: rect.midY / height)
+                let unitSize = CGSize(width: tileWidth / width, height: tileHeight / height)
+                // Deterministic per-shard rotation from grid position rather
+                // than true randomness, so behavior is stable/reproducible:
+                // spans roughly -24...+24 degrees.
+                let rotation = (Double((row * columns + col) % 7) - 3.0) * 8.0
+                shards.append(Shard(id: id, image: UIImage(cgImage: cropped), unitCenter: unitCenter,
+                                     unitSize: unitSize, rotation: rotation))
+                id += 1
+            }
+        }
+        return shards
     }
 }
