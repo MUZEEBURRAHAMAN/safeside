@@ -31,7 +31,19 @@ final class SessionService {
             client = nil
             return
         }
-        let client = SupabaseClient(supabaseURL: url, supabaseKey: key)
+        // emitLocalSessionAsInitialSession: opt into supabase-swift's upcoming
+        // (next-major) auth behavior now — emit the persisted session as the
+        // initial session instead of the pre-refresh one. Silences the runtime
+        // warning and matches how bootstrap() consumes the session.
+        let client = SupabaseClient(
+            supabaseURL: url,
+            supabaseKey: key,
+            options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(
+                    emitLocalSessionAsInitialSession: true
+                )
+            )
+        )
         self.client = client
         Task { [weak self] in await self?.bootstrap(client) }
     }
