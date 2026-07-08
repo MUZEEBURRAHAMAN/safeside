@@ -1,5 +1,31 @@
 import Foundation
 
+/// One turn in the grounded per-product chat (`POST chat`: `{ productId,
+/// messages }`). Only `role`/`content` cross the wire — `id` and `sources`
+/// are client-side-only presentation state (see `CodingKeys`), so encoding a
+/// history for the request never round-trips them, matching the backend
+/// contract exactly.
+struct ChatMessage: Codable, Identifiable, Equatable {
+    enum Role: String, Codable { case user, assistant }
+
+    var id: UUID = UUID()
+    let role: Role
+    let content: String
+    /// Populated locally from `ChatReply.sources` for an assistant turn;
+    /// always empty for a user turn. Never sent to the backend.
+    var sources: [Source] = []
+
+    enum CodingKeys: String, CodingKey { case role, content }
+}
+
+/// `POST chat` response body: the grounded reply, the sources it drew on,
+/// and the "informational, not medical advice" disclaimer to show with it.
+struct ChatReply: Codable {
+    let reply: String
+    let sources: [Source]
+    let disclaimer: String
+}
+
 /// Thin async client to OUR backend (docs/BACKEND_SPEC.md), via Supabase Edge
 /// Functions. The app never calls Open Food Facts / USDA / the LLM directly —
 /// the backend holds all keys and does the scoring, caching, and AI.
@@ -99,5 +125,22 @@ struct APIClient {
     func analyzeLabel(text: String) async throws -> Product {
         let body = try JSONEncoder().encode(["text": text])
         return try await request("product/ocr", method: "POST", body: body)
+    }
+
+    private struct ChatRequestBody: Encodable {
+        let productId: String
+        let messages: [ChatMessage]
+    }
+
+    /// Grounded, per-product AI chat (docs contract: `POST chat`). Sends the
+    /// full running `messages` history on every call — the backend is
+    /// stateless per turn — and returns one assistant reply, its sources,
+    /// and the disclaimer to show alongside it. Never medical advice; the
+    /// backend is the only thing that ever fabricates prose here — all
+    /// nutrition/score numbers it references were already computed
+    /// server-side (CLAUDE.md: "the LLM never does the math").
+    func chat(productID: String, messages: [ChatMessage]) async throws -> ChatReply {
+        let body = try JSONEncoder().encode(ChatRequestBody(productId: productID, messages: messages))
+        return try await request("chat", method: "POST", body: body)
     }
 }

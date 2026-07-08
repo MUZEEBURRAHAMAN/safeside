@@ -38,6 +38,7 @@ struct ProductView: View {
     @State private var showBetterOptionSheet = false
     @State private var showMethodologySheet = false
     @State private var showReportIssueSheet = false
+    @State private var showChat = false
 
     private enum IngredientsLoadPhase: Equatable { case idle, loading, failed }
 
@@ -121,11 +122,18 @@ struct ProductView: View {
                     onReportIssue: { showReportIssueSheet = true }
                 )
 
-                // Next action — never a dead-end. The swaps engine isn't
-                // built yet (Phase 3), so this opens a calm sheet with a
-                // real, generic next step instead of a fabricated swap.
-                NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
-                    showBetterOptionSheet = true
+                VStack(spacing: Theme.Space.s3) {
+                    // Grounded per-product AI chat (see ChatView.swift) —
+                    // secondary pill so it never competes with the primary
+                    // next-action below.
+                    askAboutProductButton
+
+                    // Next action — never a dead-end. The swaps engine isn't
+                    // built yet (Phase 3), so this opens a calm sheet with a
+                    // real, generic next step instead of a fabricated swap.
+                    NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
+                        showBetterOptionSheet = true
+                    }
                 }
 
                 AttributionFooter()
@@ -152,6 +160,9 @@ struct ProductView: View {
         }
         .sheet(isPresented: $showReportIssueSheet) {
             ReportIssueSheet(productName: workingProduct.name)
+        }
+        .sheet(isPresented: $showChat) {
+            ChatView(product: workingProduct)
         }
         .task {
             // Order matters: the pantry re-fetch can itself populate
@@ -234,6 +245,28 @@ struct ProductView: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+    }
+
+    /// Entry point into `ChatView` — a grounded chat scoped to this one
+    /// product ("Is this safe?", "Why this score?"). Secondary (outline)
+    /// pill per docs/DESIGN_SYSTEM_V3.md §5.1, so it reads as an alternate
+    /// path alongside the primary "See a better option" CTA rather than
+    /// competing with it.
+    private var askAboutProductButton: some View {
+        Button {
+            showChat = true
+        } label: {
+            HStack(spacing: Theme.Space.s2) {
+                Image(systemName: "message.fill")
+                Text("Ask about this product").font(.body.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+        }
+        .foregroundStyle(Theme.greenDeep)
+        .background(
+            Capsule().strokeBorder(Theme.greenDeep, lineWidth: 1.5)
+        )
+        .accessibilityHint("Opens a chat grounded in this product's data")
     }
 
     /// Allergen alert — the safety wedge (see CLAUDE.md non-negotiable #2:
