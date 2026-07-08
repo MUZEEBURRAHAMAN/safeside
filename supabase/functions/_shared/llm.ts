@@ -15,13 +15,24 @@
  */
 
 export interface LlmMessage {
-  role: "system" | "user";
+  // "assistant" supports multi-turn chat history (grounded /chat endpoint);
+  // the ingredient rewrite only ever uses system + user.
+  role: "system" | "user" | "assistant";
   content: string;
+}
+
+/** Per-call options. All optional so existing callers are unaffected. */
+export interface LlmCompleteOptions {
+  /** Hard cap on completion tokens (cost control; see BACKEND_SPEC §5). */
+  maxTokens?: number;
 }
 
 export interface LlmClient {
   /** Return the assistant message content (expected to be a JSON object). */
-  complete(messages: LlmMessage[]): Promise<string>;
+  complete(
+    messages: LlmMessage[],
+    options?: LlmCompleteOptions,
+  ): Promise<string>;
 }
 
 export const DEFAULT_LLM_BASE_URL = "https://api.groq.com/openai/v1";
@@ -52,7 +63,10 @@ export function createLlmClient(
   const model = env.LLM_MODEL?.trim() || DEFAULT_LLM_MODEL;
 
   return {
-    async complete(messages: LlmMessage[]): Promise<string> {
+    async complete(
+      messages: LlmMessage[],
+      options?: LlmCompleteOptions,
+    ): Promise<string> {
       const res = await fetchImpl(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -64,6 +78,7 @@ export function createLlmClient(
           messages,
           temperature: 0.2,
           response_format: { type: "json_object" },
+          ...(options?.maxTokens ? { max_tokens: options.maxTokens } : {}),
         }),
       });
       if (!res.ok) {

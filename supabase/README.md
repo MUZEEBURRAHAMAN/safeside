@@ -12,11 +12,13 @@ endpoint. See `docs/BACKEND_SPEC.md`, `docs/DATA_MODEL.md`,
 | GET | `/product/:barcode` | `product` | barcode → cache → OFF → score |
 | POST | `/product/ocr` | `product-ocr` | on-device OCR label text → provisional (limited) product |
 | GET | `/product/:id/ingredients` | `ingredients` | AI ingredient explanations (retrieval-not-generation, cached) |
+| POST | `/chat` | `chat` | grounded product Q&A (Phase 3) — answers about ONE product, from its data only |
 
 Edge Function names can't contain slashes, so the OCR and ingredient functions
 deploy as `product-ocr` and `ingredients`. The `ingredients` handler accepts both
 `/ingredients/:id` and `/product/:id/ingredients` (and `?id=`); route the friendly
-client paths at the edge/gateway if desired.
+client paths at the edge/gateway if desired. The `chat` function has no slash, so
+its client path is simply `POST /functions/v1/chat`.
 
 ## Layout
 
@@ -52,6 +54,9 @@ supabase/
     ingredients/
       index.ts                         # Deno.serve wiring (service role + LLM client from env)
       handler.ts                       # pure handler — resolve KB → cache → rewrite → { ingredients: [...] }
+    chat/
+      index.ts                         # Deno.serve wiring (service role for product/score/KB; user-scoped client for the profile)
+      handler.ts                       # pure handler — assemble grounding context → bounded prompt → guarded reply → { reply, sources, disclaimer }
 ```
 
 ## Nutrient enrichment (USDA FoodData Central)
@@ -106,12 +111,71 @@ Bumping content → bump `KB_VERSION` in **both** `_shared/kb/kb.ts` and
 `tools/build_kb_seed.py` (`KB_VERSION` constant), then regenerate — this refreshes
 every seed row's `kb_version` and invalidates cached rewrites.
 
+## Grounded AI chat (the `chat` endpoint)
+
+`POST /chat` answers a user's questions about **one specific scanned product**
+("Is this safe?", "Can my kid eat this?", "Why this score?", "Better
+alternatives?") — grounded ONLY in that product's real data, never free-floating
+medical advice. It reuses the ingredient endpoint's philosophy: the LLM
+re-phrases facts we already hold, it does not generate them.
+
+Request body: `{ "productId": "<uuid>", "messages": [{ "role": "user"|"assistant", "content": "..." }] }`
+
+Response (CONTRACT — iOS depends on it exactly):
+
+```json
+{
+  "reply": "<assistant text>",
+  "sources": [ { "name": "string", "url": "string|null" } ],
+  "disclaimer": "Information only — not medical advice."
+}
+```
+
+**How the grounding context is built** (server-side, by `productId`):
+
+- the **product** (name/brand/nutrients/NOVA/Nutri-Score/additives/allergens),
+- its latest **`score_results` breakdown** (sub-scores + weights + the
+  plain-language factor details + sources),
+- the matching **`ingredient_kb` entries** for its additives/ingredients
+  (resolved by reusing the `ingredients` endpoint's `buildCandidates` — unknown
+  ingredients contribute **no** facts, so the model can't invent them),
+- optionally the caller's **profile** (allergies / health flags / diet),
+  read under RLS with a user-scoped client (their JWT); any problem → skipped.
+
+The context is serialized into a strict bounded **system prompt**, followed by
+the (bounded) conversation history as real user/assistant turns.
+
+**Guardrails (ship-blocking, mirror the ingredients endpoint):**
+
+- **Grounded only** — the prompt orders the model to answer from the provided
+  data and to say it doesn't have the info otherwise; never outside knowledge.
+- **Not medical advice** — never diagnose/prescribe/"safe for your condition";
+  for "can my kid/pregnant/diabetic eat this" it states the factual data (which
+  additives + reviewed tier, which allergens) plus "general information, not
+  medical advice; check with a professional". The `disclaimer` is **always**
+  returned.
+- **Banned-word filter** — the reused `hasBannedWord` (from `_shared/kb/kb.ts`)
+  runs on the model output; any fear word discards it for a neutral canned reply.
+- **Sources are deterministic** — built from the score factors + resolved KB
+  entries (deduped), never from the model, so a citation/URL can't be fabricated.
+- **Graceful degradation** — no `LLM_API_KEY` (or any LLM error / unparsable
+  output) → a canned "AI chat is unavailable right now" reply; never crashes.
+- **Bounded cost** — output tokens capped (`max_tokens`), history trimmed to the
+  last ~8 turns, each message length-capped.
+
+Env vars are the same `LLM_*` set as the ingredient endpoint (below); `chat`
+additionally uses `SUPABASE_ANON_KEY` (platform-injected) for the user-scoped
+profile read.
+
 ## Tests
 
 No network, no DB (the LLM + fetch are mocked). All 50 calibration products must
-match exactly, and the AI guardrail suite (no-hallucination, banned-language,
-risk-consistency, unknown-ingredient, missing-LLM-key) + OCR parsing + KB-seed
-integrity + USDA mapping/merge + product-handler enrichment all pass (97 tests).
+match exactly, and the AI guardrail suites — ingredient (no-hallucination,
+banned-language, risk-consistency, unknown-ingredient, missing-LLM-key) and chat
+(grounded prompt assembly, banned-word/no-medical-advice, no-fabrication,
+missing-key graceful reply, 404 + validation) — plus OCR parsing, KB-seed
+integrity, USDA mapping/merge, and product-handler enrichment all pass
+(121 tests).
 
 ```sh
 cd supabase/functions
@@ -131,6 +195,7 @@ supabase db push
 supabase functions deploy product
 supabase functions deploy product-ocr
 supabase functions deploy ingredients
+supabase functions deploy chat
 
 # 4. Seed the ingredient KB (service role) from _shared/kb/ingredient_kb_seed.json.
 

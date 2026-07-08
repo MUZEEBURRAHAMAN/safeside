@@ -4,6 +4,14 @@
 
 ## Decisions log
 
+### 2026-07 · Scanner rebuilt (real zoom + shatter), grounded AI chat, USDA live
+- **Scanner core replaced: DataScannerViewController → custom AVCaptureSession.** DataScanner has NO zoom API (why zoom "did nothing"). New pipeline: virtual multi-camera (`builtInTripleCamera`/dual → real optical lens switching) + `AVCaptureMetadataOutput` (barcodes) + `AVCapturePhotoOutput` (OCR stills) + `AVCaptureVideoDataOutput` (shatter frame). `cycleZoom` 1×/2×/3× clamped to device max, applied to the exact session device. Session work serialized on a private queue, UI hopped to main.
+- **Right-edge control cluster** (zoom / gallery / torch) + instruction pill moved below the reticle (was colliding with nav). **Gallery** = pick a photo → VNDetectBarcodes → live-lookup, else OCR.
+- **Scan-success "shatter" animation** (founder request, from a web ref): on lock, the frozen camera frame breaks into a 5×8 grid of shards that fly out + fade 0.45s (Reduce Motion → lime flash). Doesn't gate lookup.
+- **Grounded AI chat** (Phase 3, pulled before Phase D): `POST /chat` grounds on the product's DB data + score breakdown + ingredient KB + (RLS) profile; bounded LLM (Groq), banned-word filter, **always "not medical advice"**, sources from data not the model, graceful without a key. iOS `ChatView` sheet from Result ("Ask about this product"). 121 deno tests. Live-verified: "safe for my kid?" → factual + sourced + declines medical verdict. **Legal/FTC review of claim language still required before this ships publicly** (Phase 3 exit criterion).
+- **USDA enrichment now LIVE** — `USDA_API_KEY` set as a Supabase secret (key valid; rotate — pasted in chat). Applies on fetch-path scans; score_version 1.1.0 means re-scans re-enrich.
+- **Note:** the gitignored `ios/FoodScanner.xcodeproj` keeps getting deleted between build steps by something in the env — always `xcodegen generate` immediately before `xcodebuild`, and confirm it exists, or the build reinstalls a stale binary.
+
 ### 2026-07 · UI/UX overhaul (Design System v3) + functionality wave
 - **Founder directive locked:** UI/UX is priority #1, never compromised; launch + payment (Sign in with Apple, RevenueCat) go LAST. Build-to-spec + review-on-device; keep+elevate bold-green; references Yuka/Cal AI/Oasis/Ingrex. See [[ui-ux-first-directive]].
 - **Design System v3** (`docs/DESIGN_SYSTEM_V3.md`): resolved light-vs-dark → **light-first** (mint canvas #F4F8F1, white flat cards, radius 20, pill CTAs, Space Grotesk display font bundled OFL) + bold-green accent + dark only for the scan moment. Studied the founder's `reference/moodboards` + `reference/screenshots` (Ingrex/Ivy/Oasis). Theme tokens rewritten light-first.
