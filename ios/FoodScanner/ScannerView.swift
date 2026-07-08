@@ -193,13 +193,13 @@ final class CameraViewController: UIViewController {
     /// and starts the session running.
     private func setUpSession() {
         session.beginConfiguration()
-        defer { session.commitConfiguration() }
         session.sessionPreset = .photo // recommended preset when the session includes an AVCapturePhotoOutput
 
         guard let device = Self.bestBackVideoDevice() else {
             // ScanScreen already gates entry into this screen on
             // `CameraAvailability.current` finding a video device, so this
             // is a defensive no-op path in practice, not a real user-facing case.
+            session.commitConfiguration()
             return
         }
 
@@ -207,9 +207,10 @@ final class CameraViewController: UIViewController {
         do {
             input = try AVCaptureDeviceInput(device: device)
         } catch {
+            session.commitConfiguration()
             return
         }
-        guard session.canAddInput(input) else { return }
+        guard session.canAddInput(input) else { session.commitConfiguration(); return }
         session.addInput(input)
         videoDevice = device
 
@@ -251,6 +252,10 @@ final class CameraViewController: UIViewController {
         }
 
         isConfigured = true
+        // Commit BEFORE starting — startRunning() must never be called between
+        // beginConfiguration/commitConfiguration (that raises NSGenericException
+        // and crashes the app). The old `defer commit` ran after this line.
+        session.commitConfiguration()
         if !session.isRunning { session.startRunning() }
     }
 

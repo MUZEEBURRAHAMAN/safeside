@@ -35,6 +35,8 @@ struct FoodScannerApp: App {
                 harness { PlanView() }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "onboarding" {
                 harness { OnboardingView {} }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "scan" {
+                harness { NavigationStack { ScanScreen() } }
             } else {
                 appBody
             }
