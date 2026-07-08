@@ -4,6 +4,15 @@
 
 ## Decisions log
 
+### 2026-07 · Phase 2 wave 2: OCR fallback, favorites, trending, next-action, additives fix
+- **4 parallel agents, strict file ownership + a pinned favorites API contract** (`isFavorite(_:)` / `toggleFavorite(productID:) async`) shared verbatim between the result-page and home agents so they interlocked. `ProductView(product:)` init frozen so no agent broke others' call sites. All 4 merged and compiled clean first try; on device.
+- **Additives "bug" was a stale deployment**, not code — the mapping already existed. Redeployed `ingredients`; Coca-Cola now surfaces E150d/E338 with sources + risk tier. Added prefix-tolerance (`e338` == `en:e338`) + 6 regression tests (78 total).
+- **On-device OCR shipped:** `needsOCR` → "Snap the label" → `DataScannerViewController.capturePhoto()` (verified against the SDK swiftinterface — reuses the scanner's own session, avoids a second contending AVCaptureSession) → `VNRecognizeTextRequest .accurate` → `POST /product/ocr`. New phases `.capturingLabel` / `.labelNotFound`; lighting-fail vs network-fail get different honest copy.
+- **Favorites:** optimistic in-memory `Set` (sync `isFavorite`), status flips scanned↔favorited; works on never-scanned products (trending cards). Home has Recent/Favorites filter + heart on rows/cards.
+- **Trending healthy:** top `band=high` products, horizontal cards. KNOWN LIMITATION: takes highest-ever high score per product from a fetched window (score_results keeps history; PG can't do top-1-per-group in one call) — proper fix is a backend view exposing the current score per product.
+- **Next-action** is honest: no fabricated swaps (engine is Phase 3) — a band-specific tip + real "scan another" CTA. Copy is new, needs a COPY_DECK pass.
+- Follow-ups noted: ingredient-load error needs manual retry (auto-retry?); OCR parenthetical `colour (E150d)` yields a redundant orphan "Colour" entry; trending current-score view.
+
 ### 2026-07 · Phase 2 wave 1: pantry, onboarding, AI ingredient KB, OCR (deployed + on device)
 - **Four features shipped in parallel** (2 backend + 2 iOS agents): pantry auto-save, Home recent-scans, skippable onboarding, AI ingredient explanations, OCR endpoint. All committed; app rebuilt + installed on the iPhone 13.
 - **AI ingredient KB is live and guardrailed.** `ingredient_kb` (73 curated entries: 51 additives from the scoring table + 22 common ingredients, every claim regulator-sourced) + `ingredient_explanations` cache. `GET /product/:id/ingredients`: KB retrieval → cache → bounded LLM rewrite of **only** the what/whyUsed/safety prose; riskTier/sources/etc are verbatim from the KB so the LLM can't move risk. KB miss → "no vetted info yet" (never fabricates). 72 deno tests incl. all 5 §7 guardrails. Live-verified: "Sugar" → WHO/USDA-sourced explanation; unknown token → limited state.
