@@ -4,6 +4,16 @@
 
 ## Decisions log
 
+### 2026-07 · Phase 2 wave 1: pantry, onboarding, AI ingredient KB, OCR (deployed + on device)
+- **Four features shipped in parallel** (2 backend + 2 iOS agents): pantry auto-save, Home recent-scans, skippable onboarding, AI ingredient explanations, OCR endpoint. All committed; app rebuilt + installed on the iPhone 13.
+- **AI ingredient KB is live and guardrailed.** `ingredient_kb` (73 curated entries: 51 additives from the scoring table + 22 common ingredients, every claim regulator-sourced) + `ingredient_explanations` cache. `GET /product/:id/ingredients`: KB retrieval → cache → bounded LLM rewrite of **only** the what/whyUsed/safety prose; riskTier/sources/etc are verbatim from the KB so the LLM can't move risk. KB miss → "no vetted info yet" (never fabricates). 72 deno tests incl. all 5 §7 guardrails. Live-verified: "Sugar" → WHO/USDA-sourced explanation; unknown token → limited state.
+- **LLM is provider-agnostic** (OpenAI-compatible). Using **Groq** (`llama-3.3-70b-versatile`) via free key — stored as Supabase secrets `LLM_API_KEY/LLM_BASE_URL/LLM_MODEL`, never in repo. Google AI Studio key the founder gave was an `AQ.`-prefixed OAuth token, not a usable `AIza` Gemini API key — rejected. **Both pasted keys must be rotated** (chat logs persist).
+- **KNOWN GAP (follow-up):** the ingredients endpoint explains `ingredients_text` tokens but does NOT yet map `additives_tags` (e.g. `en:e150d`, `en:e338`) to their KB entries, so additives with real KB entries don't surface on the result screen. Pipeline is otherwise sound. Fix next.
+- **OCR endpoint** `POST /product/ocr`: label text (on-device Vision does the OCR) → parse → same scoring engine (always unknown/limited, honest) → provisional `source=ocr` product. iOS Vision capture not wired yet.
+- **Cache seeded** with 10 real barcodes across the spectrum (28–97) for demo/instant re-scan.
+- **Pantry detail is thin:** pantry-tapped products show score but empty "why"/ingredients (list read selects few columns); needs a re-fetch-by-id later. `save()` is update-then-insert (not upsert) to preserve `first_scanned_at`.
+- **Test note:** full `xcodebuild test` (incl. XCUITest) times out ~10min on sim boot; run `-only-testing:FoodScannerTests` for fast unit runs (5 pass).
+
 ### 2026-07 · First vertical slice LIVE (backend deployed + iOS builds/tests green)
 - **Backend deployed to Supabase** (`usmdthxnxzdywtjgbokl`): schema migration applied via Management API (5 tables, RLS verified), anonymous sign-ins enabled, `product` Edge Function deployed. **Live end-to-end test passed:** anonymous JWT → `GET /functions/v1/product/3017624010701` → Nutella scored 38/"low" with sourced factor breakdown; cached row + score persisted; second call = cache hit.
 - **Real-world data gap surfaced:** OFF currently returns no `nova_group` and empty `additives_tags` for Nutella — the renormalization path (nutrition 0.70 / additives 0.30, "limited" confidence) fired in production on scan #1. Validates the design; also confirms USDA enrichment + OFF data-quality handling matter early.
