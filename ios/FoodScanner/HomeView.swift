@@ -86,11 +86,12 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, Theme.Space.s4)
-                .padding(.bottom, Theme.Space.s6)
+                .padding(.bottom, Theme.Space.s7)   // clear the tab bar
             }
             .background(Theme.canvas)
-            .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(.inline)
+            // Hero headline is the screen's title — no redundant nav-bar title
+            // (also removes the green card "ghosting" under a translucent bar).
+            .toolbar(.hidden, for: .navigationBar)
             .task(id: session.userID) {
                 // Re-runs once the anonymous session's userID resolves
                 // (bootstrap is async), and whenever it changes (e.g. later
@@ -132,11 +133,12 @@ struct HomeView: View {
     // MARK: - Pantry (recent scans / favorites)
 
     private var pantryHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s3) {
+        // Title on its own line; chips on a second row so the big display title
+        // never squeezes the chips into wrapping ("Re-cent"/"Fa-vorites").
+        VStack(alignment: .leading, spacing: Theme.Space.s3) {
             Text(pantryFilter == .recent ? "Recent scans" : "Favorites")
                 .font(DisplayType.h2)
                 .foregroundStyle(Theme.textPrimary)
-            Spacer(minLength: Theme.Space.s2)
             filterChips
         }
     }
@@ -269,7 +271,6 @@ private struct ScanCTACard: View {
             .background(Theme.greenDeep, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         }
         .buttonStyle(CardPressButtonStyle())
-        .elevation(.floating)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Scan a product")
         .accessibilityHint("Opens the scanner to scan a barcode and get a clear, sourced score.")
@@ -316,6 +317,8 @@ private struct FilterChipButton: View {
         Button(action: action) {
             Text(label)
                 .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)  // never wrap ("Re-cent")
                 .foregroundStyle(isSelected ? Theme.ink : Theme.textSecondary)
                 .padding(.horizontal, Theme.Space.s4)
                 .frame(minHeight: 36)

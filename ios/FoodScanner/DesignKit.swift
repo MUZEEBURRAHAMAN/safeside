@@ -78,9 +78,11 @@ extension View {
         shadow(color: level.color, radius: level.radius, x: 0, y: level.y)
     }
 
-    /// Standard surface card: surface fill, `radius.md`, subtle border + card
-    /// elevation, `space.4` padding. The one true card container so every list
-    /// row / panel matches (§5.4). Pass `padded: false` to supply your own.
+    /// Standard surface card: white fill, `radius.md`, hairline border, `space.4`
+    /// padding. FLAT by design (§4 "flat by default") — no drop shadow; the
+    /// white card reads against the tinted canvas via the border alone. The one
+    /// true card container so every panel matches (§5.4). `padded: false` to
+    /// supply your own padding.
     func surfaceCard(padded: Bool = true) -> some View {
         self
             .padding(padded ? Theme.Space.s4 : 0)
@@ -89,6 +91,5 @@ extension View {
                 RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .strokeBorder(Theme.border, lineWidth: 1)
             )
-            .elevation(.card)
     }
 }
