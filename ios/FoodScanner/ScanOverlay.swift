@@ -51,17 +51,14 @@ struct ScanOverlay: View {
                     .position(center)
                     .accessibilityHidden(true)
 
-                VStack(spacing: 0) {
-                    topBar
-                        // GeometryProxy.safeAreaInsets still reports the
-                        // nav-bar/status-bar inset here even though this view
-                        // (and its ScannerView sibling) ignore safe area to
-                        // bleed the dark camera full-screen — that's what lets
-                        // the pill sit cleanly below the nav bar instead of
-                        // guessing a fixed offset.
-                        .padding(.top, proxy.safeAreaInsets.top + Theme.Space.s3)
-                        .padding(.horizontal, Theme.Space.s4)
-                    Spacer(minLength: 0)
+                // Instruction pill sits just BELOW the reticle (not at the top,
+                // where it collided with the nav bar). Positioned relative to
+                // the reticle so it tracks the frame on every device.
+                if showsControlCluster {
+                    instructionLabel
+                        .position(x: center.x,
+                                  y: center.y + reticleSize / 2 + Theme.Space.s6)
+                        .accessibilityAddTraits(.isStaticText)
                 }
 
                 if showsControlCluster {
