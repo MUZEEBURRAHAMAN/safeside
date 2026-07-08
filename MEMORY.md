@@ -4,6 +4,14 @@
 
 ## Decisions log
 
+### 2026-07 · First vertical slice LIVE (backend deployed + iOS builds/tests green)
+- **Backend deployed to Supabase** (`usmdthxnxzdywtjgbokl`): schema migration applied via Management API (5 tables, RLS verified), anonymous sign-ins enabled, `product` Edge Function deployed. **Live end-to-end test passed:** anonymous JWT → `GET /functions/v1/product/3017624010701` → Nutella scored 38/"low" with sourced factor breakdown; cached row + score persisted; second call = cache hit.
+- **Real-world data gap surfaced:** OFF currently returns no `nova_group` and empty `additives_tags` for Nutella — the renormalization path (nutrition 0.70 / additives 0.30, "limited" confidence) fired in production on scan #1. Validates the design; also confirms USDA enrichment + OFF data-quality handling matter early.
+- **iOS builds + all tests green** on iPhone 17 Pro simulator (Xcode 26.6, supabase-swift 2.50.0, RevenueCat 5.80.2). Two first-build fixes: (1) VisionKit `DataScannerViewController.isSupported` is MainActor-isolated → `CameraAvailability.current` marked `@MainActor`, availability resolved `.onAppear` (`@State` defaults evaluate off-main); (2) test targets need `GENERATE_INFOPLIST_FILE: YES` in project.yml or signing fails.
+- **SPM gotcha:** killing xcodebuild mid-resolve corrupts the package cache ("Couldn't get the list of tags: fatal: not a git repository") → delete the project's DerivedData and re-resolve.
+- Secrets: Supabase URL/anon key in `ios/Config.xcconfig` (gitignored) + `~/.env`; access token (30-day expiry) in `~/.env`. Nothing in the repo.
+- Remaining for milestone: run on a physical iPhone (needs device + team in Xcode) + real camera scan.
+
 ### 2026-07 · Build started: repo, fixtures, scoring rule locked, parallel tracks
 - **Git repo initialized** (was folder-only). `.gitignore` excludes secrets (`.env*`), Xcode user state, generated `.xcodeproj` (regenerated via XcodeGen).
 - **Calibration extracted to fixtures:** `tools/extract_calibration.py` (stdlib-only) parses `docs/Scoring_Calibration.xlsx` → `supabase/functions/_shared/scoring/{weights,calibration}.json`. Verified the formula reproduces **all 50 expected scores exactly**.
