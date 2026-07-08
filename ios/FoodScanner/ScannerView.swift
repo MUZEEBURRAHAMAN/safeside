@@ -104,6 +104,7 @@ private enum CameraAvailability: Equatable {
     case unsupportedDevice  // no camera / unsupported hardware (e.g. Simulator).
     case permissionDenied   // user previously said no — only Settings can fix this.
 
+    @MainActor
     static var current: CameraAvailability {
         guard DataScannerViewController.isSupported else { return .unsupportedDevice }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
@@ -120,12 +121,15 @@ struct ScanScreen: View {
     @Environment(SessionService.self) private var session
     @Environment(\.scenePhase) private var scenePhase
     @State private var vm = ScanViewModel()
-    @State private var availability = CameraAvailability.current
+    // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
+    // and @State default values are evaluated outside the main actor).
+    @State private var availability = CameraAvailability.ready
 
     var body: some View {
         content
             .navigationTitle("Scan")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { availability = .current }
             .navigationDestination(isPresented: $vm.showProduct) {
                 if let product = vm.product {
                     ProductView(product: product)
