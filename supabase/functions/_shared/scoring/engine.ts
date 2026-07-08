@@ -13,7 +13,10 @@
 
 import weights from "./weights.json" with { type: "json" };
 
-export const SCORE_VERSION = "1.0.0";
+// Bumped 1.0.0 → 1.1.0 when additives_risk.json grew to v1.1 (more reviewed
+// E-numbers). The cache treats older-version scores as stale and re-scores on
+// next fetch, so products with newly-reviewed additives pick up the change.
+export const SCORE_VERSION = "1.1.0";
 
 export type AdditiveTier = "low" | "moderate" | "higher";
 

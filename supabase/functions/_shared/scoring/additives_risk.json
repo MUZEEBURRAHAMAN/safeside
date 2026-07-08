@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "version": "1.0",
+    "version": "1.1",
     "lastReviewed": "2026-07",
     "governance": "Curated additive risk table per SCORING_METHODOLOGY.md §5. Tiers reflect RISK (real-world dietary exposure vs regulatory intake limits), not theoretical hazard. Every entry cites a named regulatory review (EFSA, FDA, JECFA, IARC) — never blogs or single cherry-picked studies. Keys match Open Food Facts additives_tags format (en:eXXX). Changes to this table increment the score_version; log changes in MEMORY.md. Additives not present in this table are scored as low tier and flagged as 'not yet reviewed' in the score detail — absence of review is never treated as evidence of concern.",
     "tiers": {
@@ -526,6 +526,736 @@
     "sources": [
       { "name": "EFSA sweeteners re-evaluation programme", "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners" },
       { "name": "WHO guideline on non-sugar sweeteners, 2023", "url": "https://www.who.int/publications/i/item/9789240073616" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e140": {
+    "eNumber": "E140",
+    "name": "Chlorophylls",
+    "tier": "low",
+    "reason": "A green plant-derived colour; EFSA re-evaluated it as a food colour and placed no numeric intake limit on it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of chlorophylls (E140) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e150a": {
+    "eNumber": "E150a",
+    "name": "Plain caramel",
+    "tier": "low",
+    "reason": "A plain caramel colour made by heating carbohydrates; EFSA set a group ADI for caramel colours that plain caramel stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of caramel colours (E150a-d), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2004" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e150c": {
+    "eNumber": "E150c",
+    "name": "Ammonia caramel",
+    "tier": "moderate",
+    "reason": "An ammonia caramel colour; EFSA set a group ADI for caramel colours and estimated that high consumers of some products can approach it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of caramel colours (E150a-d), 2011", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/2004" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e153": {
+    "eNumber": "E153",
+    "name": "Vegetable carbon",
+    "tier": "low",
+    "reason": "A black colour made from charred plant material; EFSA found reported food uses to be of no safety concern.",
+    "sources": [
+      { "name": "EFSA re-evaluation of vegetable carbon (E153) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e160e": {
+    "eNumber": "E160e",
+    "name": "Beta-apo-8'-carotenal",
+    "tier": "low",
+    "reason": "An orange carotenoid colour; EFSA set an ADI and estimated dietary exposure stays within it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of beta-apo-8'-carotenal (E160e) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e162": {
+    "eNumber": "E162",
+    "name": "Beetroot red (betanin)",
+    "tier": "low",
+    "reason": "A red colour from beetroot; EFSA found no safety concern and placed no numeric intake limit on it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of beetroot red (E162) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e163": {
+    "eNumber": "E163",
+    "name": "Anthocyanins",
+    "tier": "low",
+    "reason": "Purple-red plant colours from fruit and vegetables; EFSA found reported food uses to be of no safety concern.",
+    "sources": [
+      { "name": "EFSA re-evaluation of anthocyanins (E163) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e172": {
+    "eNumber": "E172",
+    "name": "Iron oxides and hydroxides",
+    "tier": "low",
+    "reason": "Mineral iron-based colours; EFSA set an ADI and estimated dietary exposure stays within it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of iron oxides and hydroxides (E172) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e200": {
+    "eNumber": "E200",
+    "name": "Sorbic acid",
+    "tier": "low",
+    "reason": "A common preservative; EFSA set a revised group ADI for sorbic acid and sorbates in 2019 and typical exposure stays within it.",
+    "sources": [
+      { "name": "EFSA revised group ADI for sorbic acid and potassium sorbate (E200, E202), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5625" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e203": {
+    "eNumber": "E203",
+    "name": "Calcium sorbate",
+    "tier": "low",
+    "reason": "A preservative in the sorbate group; EFSA set a revised group ADI in 2019 that typical exposure stays within.",
+    "sources": [
+      { "name": "EFSA revised group ADI for sorbic acid and potassium sorbate (E200, E202), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5625" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e210": {
+    "eNumber": "E210",
+    "name": "Benzoic acid",
+    "tier": "moderate",
+    "reason": "A preservative with an EFSA group ADI; intake by children who consume many soft drinks can approach the ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of benzoic acid and benzoates (E210-E213), 2016", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4433" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e212": {
+    "eNumber": "E212",
+    "name": "Potassium benzoate",
+    "tier": "moderate",
+    "reason": "A preservative in the benzoate group with an EFSA group ADI; intake by high consumers of soft drinks can approach the ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of benzoic acid and benzoates (E210-E213), 2016", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4433" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e223": {
+    "eNumber": "E223",
+    "name": "Sodium metabisulphite",
+    "tier": "moderate",
+    "reason": "A sulphite preservative and antioxidant; EFSA's 2022 re-evaluation could not confirm the previous ADI due to data gaps, and it must be declared as an allergen in the EU and US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sulphur dioxide and sulphites (E220-E228), 2022", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/7594" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e224": {
+    "eNumber": "E224",
+    "name": "Potassium metabisulphite",
+    "tier": "moderate",
+    "reason": "A sulphite preservative and antioxidant; EFSA's 2022 re-evaluation could not confirm the previous ADI due to data gaps, and it must be declared as an allergen in the EU and US.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sulphur dioxide and sulphites (E220-E228), 2022", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/7594" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e234": {
+    "eNumber": "E234",
+    "name": "Nisin",
+    "tier": "low",
+    "reason": "A preservative produced by fermentation; EFSA re-evaluated it and set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of nisin (E234) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e235": {
+    "eNumber": "E235",
+    "name": "Natamycin",
+    "tier": "low",
+    "reason": "A preservative used on the surface of cheese and cured meats; EFSA set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of natamycin (E235) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e280": {
+    "eNumber": "E280",
+    "name": "Propionic acid",
+    "tier": "low",
+    "reason": "A preservative that slows mould in baked goods; EFSA found no safety concern and placed no numeric intake limit on it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of propionic acid and propionates (E280-E283) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e282": {
+    "eNumber": "E282",
+    "name": "Calcium propionate",
+    "tier": "low",
+    "reason": "A preservative that slows mould in bread and baked goods; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of propionic acid and propionates (E280-E283) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e301": {
+    "eNumber": "E301",
+    "name": "Sodium ascorbate",
+    "tier": "low",
+    "reason": "A form of vitamin C used as an antioxidant; EFSA found no safety concern and no need for a numeric ADI.",
+    "sources": [
+      { "name": "EFSA re-evaluation of ascorbic acid (E300-E302), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4087" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e304": {
+    "eNumber": "E304",
+    "name": "Ascorbyl palmitate",
+    "tier": "low",
+    "reason": "A fat-soluble form of vitamin C used as an antioxidant; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of ascorbyl palmitate (E304) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e307": {
+    "eNumber": "E307",
+    "name": "Alpha-tocopherol",
+    "tier": "low",
+    "reason": "A form of vitamin E used as an antioxidant; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of tocopherols (E306-E309), 2015", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4247" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e310": {
+    "eNumber": "E310",
+    "name": "Propyl gallate",
+    "tier": "moderate",
+    "reason": "A synthetic antioxidant with an EFSA group ADI for gallates; some consumers can approach the group limit.",
+    "sources": [
+      { "name": "EFSA re-evaluation of propyl gallate (E310) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e392": {
+    "eNumber": "E392",
+    "name": "Extracts of rosemary",
+    "tier": "low",
+    "reason": "A plant-derived antioxidant; EFSA set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of extracts of rosemary (E392) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e262": {
+    "eNumber": "E262",
+    "name": "Sodium acetates",
+    "tier": "low",
+    "reason": "Salts of acetic acid used to regulate acidity; regulators place no numeric intake limit on them.",
+    "sources": [
+      { "name": "JECFA evaluation of sodium acetates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e263": {
+    "eNumber": "E263",
+    "name": "Calcium acetate",
+    "tier": "low",
+    "reason": "A salt of acetic acid used to regulate acidity; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of calcium acetate (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e325": {
+    "eNumber": "E325",
+    "name": "Sodium lactate",
+    "tier": "low",
+    "reason": "A salt of lactic acid used to regulate acidity and hold moisture; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of lactic acid and lactates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e327": {
+    "eNumber": "E327",
+    "name": "Calcium lactate",
+    "tier": "low",
+    "reason": "A salt of lactic acid used to regulate acidity and firm texture; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of lactic acid and lactates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e332": {
+    "eNumber": "E332",
+    "name": "Potassium citrates",
+    "tier": "low",
+    "reason": "Salts of citric acid used to regulate acidity; regulators place no numeric intake limit on them.",
+    "sources": [
+      { "name": "JECFA evaluation of citrates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e333": {
+    "eNumber": "E333",
+    "name": "Calcium citrates",
+    "tier": "low",
+    "reason": "Salts of citric acid used to regulate acidity and firm texture; regulators place no numeric intake limit on them.",
+    "sources": [
+      { "name": "JECFA evaluation of citrates (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e334": {
+    "eNumber": "E334",
+    "name": "Tartaric acid",
+    "tier": "low",
+    "reason": "A fruit acid found naturally in grapes; JECFA set an ADI that typical use stays within.",
+    "sources": [
+      { "name": "JECFA evaluation of tartaric acid", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e336": {
+    "eNumber": "E336",
+    "name": "Potassium tartrates (cream of tartar)",
+    "tier": "low",
+    "reason": "A salt of tartaric acid (cream of tartar) used to regulate acidity; JECFA set an ADI that typical use stays within.",
+    "sources": [
+      { "name": "JECFA evaluation of tartrates", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e575": {
+    "eNumber": "E575",
+    "name": "Glucono-delta-lactone",
+    "tier": "low",
+    "reason": "A mild acid used as an acidity regulator; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of glucono-delta-lactone (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e339": {
+    "eNumber": "E339",
+    "name": "Sodium phosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e340": {
+    "eNumber": "E340",
+    "name": "Potassium phosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e341": {
+    "eNumber": "E341",
+    "name": "Calcium phosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; also used as a raising agent and calcium source, and high consumers can exceed the group limit.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e451": {
+    "eNumber": "E451",
+    "name": "Triphosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e452": {
+    "eNumber": "E452",
+    "name": "Polyphosphates",
+    "tier": "moderate",
+    "reason": "Part of the phosphate group for which EFSA set a group intake limit in 2019; high consumers can exceed it.",
+    "sources": [
+      { "name": "EFSA re-evaluation of phosphoric acid and phosphates (E338-E341, E343, E450-E452), 2019", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5674" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e400": {
+    "eNumber": "E400",
+    "name": "Alginic acid",
+    "tier": "low",
+    "reason": "A seaweed-derived thickener and stabiliser; EFSA re-evaluated the alginates and found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of alginic acid and alginates (E400-E404) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e401": {
+    "eNumber": "E401",
+    "name": "Sodium alginate",
+    "tier": "low",
+    "reason": "A seaweed-derived thickener and stabiliser; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of alginic acid and alginates (E400-E404) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e414": {
+    "eNumber": "E414",
+    "name": "Gum arabic (acacia gum)",
+    "tier": "low",
+    "reason": "A plant gum (acacia) used as a thickener and stabiliser; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of gum arabic (ADI not specified)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e418": {
+    "eNumber": "E418",
+    "name": "Gellan gum",
+    "tier": "low",
+    "reason": "A fermentation-derived gelling agent and thickener; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of gellan gum (E418) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e425": {
+    "eNumber": "E425",
+    "name": "Konjac",
+    "tier": "low",
+    "reason": "A plant-fibre thickener and gelling agent; EFSA found no safety concern in foods, though it is restricted in jelly mini-cups because of a choking risk.",
+    "sources": [
+      { "name": "EFSA re-evaluation of konjac (E425) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e460": {
+    "eNumber": "E460",
+    "name": "Cellulose",
+    "tier": "low",
+    "reason": "Purified plant fibre (microcrystalline or powdered cellulose) used as a bulking agent and stabiliser; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of celluloses (E460-E469), 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5047" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e461": {
+    "eNumber": "E461",
+    "name": "Methyl cellulose",
+    "tier": "low",
+    "reason": "A plant-fibre-derived thickener and stabiliser; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of celluloses (E460-E469), 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5047" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e464": {
+    "eNumber": "E464",
+    "name": "Hydroxypropyl methyl cellulose",
+    "tier": "low",
+    "reason": "A plant-fibre-derived thickener and stabiliser; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of celluloses (E460-E469), 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5047" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e472e": {
+    "eNumber": "E472e",
+    "name": "Mono- and diacetyltartaric acid esters of mono- and diglycerides (DATEM)",
+    "tier": "low",
+    "reason": "An emulsifier made from mono- and diglycerides; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of mono- and diglyceride esters (E472a-f) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e473": {
+    "eNumber": "E473",
+    "name": "Sucrose esters of fatty acids",
+    "tier": "low",
+    "reason": "An emulsifier; EFSA set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sucrose esters of fatty acids (E473) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e475": {
+    "eNumber": "E475",
+    "name": "Polyglycerol esters of fatty acids",
+    "tier": "low",
+    "reason": "An emulsifier; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of polyglycerol esters of fatty acids (E475) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e476": {
+    "eNumber": "E476",
+    "name": "Polyglycerol polyricinoleate (PGPR)",
+    "tier": "low",
+    "reason": "An emulsifier used to improve the flow of chocolate; EFSA set an ADI that typical use stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of polyglycerol polyricinoleate (E476) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e481": {
+    "eNumber": "E481",
+    "name": "Sodium stearoyl-2-lactylate",
+    "tier": "low",
+    "reason": "An emulsifier and dough conditioner; EFSA set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of stearoyl-2-lactylates (E481, E482) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e491": {
+    "eNumber": "E491",
+    "name": "Sorbitan monostearate",
+    "tier": "low",
+    "reason": "An emulsifier; EFSA set a group ADI for sorbitan esters that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sorbitan esters (E491-E495) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e551": {
+    "eNumber": "E551",
+    "name": "Silicon dioxide",
+    "tier": "moderate",
+    "reason": "An anti-caking agent; EFSA's 2018 re-evaluation could not fully conclude on safety because of data gaps and asked for more information, while current uses stay under review.",
+    "sources": [
+      { "name": "EFSA re-evaluation of silicon dioxide (E551) as a food additive, 2018", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/5088" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e620": {
+    "eNumber": "E620",
+    "name": "Glutamic acid",
+    "tier": "moderate",
+    "reason": "EFSA set a group ADI for glutamates in 2017 and estimated some population groups can exceed it; glutamate is otherwise a normal component of protein-rich foods.",
+    "sources": [
+      { "name": "EFSA re-evaluation of glutamic acid and glutamates (E620-E625), 2017", "url": "https://www.efsa.europa.eu/en/efsajournal/pub/4910" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e627": {
+    "eNumber": "E627",
+    "name": "Disodium guanylate",
+    "tier": "low",
+    "reason": "A flavour enhancer usually paired with glutamates; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of guanylates and inosinates (E626-E635) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e631": {
+    "eNumber": "E631",
+    "name": "Disodium inosinate",
+    "tier": "low",
+    "reason": "A flavour enhancer usually paired with glutamates; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of guanylates and inosinates (E626-E635) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e635": {
+    "eNumber": "E635",
+    "name": "Disodium 5'-ribonucleotides",
+    "tier": "low",
+    "reason": "A flavour enhancer (a blend of guanylate and inosinate); EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of guanylates and inosinates (E626-E635) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e420": {
+    "eNumber": "E420",
+    "name": "Sorbitol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) used as a sweetener and humectant; regulators set no numeric ADI, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA re-evaluation of sorbitol (E420) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e421": {
+    "eNumber": "E421",
+    "name": "Mannitol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) used as a sweetener and anti-caking agent; regulators set no numeric ADI, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA re-evaluation of mannitol (E421) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e953": {
+    "eNumber": "E953",
+    "name": "Isomalt",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) sweetener; regulators set no numeric ADI, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA evaluation of isomalt (E953) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e965": {
+    "eNumber": "E965",
+    "name": "Maltitol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) sweetener; regulators set no numeric ADI, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA evaluation of maltitol (E965) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e966": {
+    "eNumber": "E966",
+    "name": "Lactitol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) sweetener; regulators set no numeric ADI, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA evaluation of lactitol (E966) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e967": {
+    "eNumber": "E967",
+    "name": "Xylitol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) sweetener; regulators set no numeric ADI for people, and EU labels note that eating a lot may have a laxative effect.",
+    "sources": [
+      { "name": "EFSA evaluation of xylitol (E967) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e968": {
+    "eNumber": "E968",
+    "name": "Erythritol",
+    "tier": "low",
+    "reason": "A sugar alcohol (polyol) sweetener that is largely not metabolised; EFSA set no numeric ADI and food authorities consider approved uses acceptable, with research on other effects ongoing.",
+    "sources": [
+      { "name": "EFSA evaluation of erythritol (E968) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e960": {
+    "eNumber": "E960",
+    "name": "Steviol glycosides (stevia)",
+    "tier": "low",
+    "reason": "A plant-derived (stevia) sweetener; EFSA and JECFA set an ADI that typical intakes stay within.",
+    "sources": [
+      { "name": "EFSA safety of steviol glycosides (E960) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/sweeteners" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e901": {
+    "eNumber": "E901",
+    "name": "Beeswax",
+    "tier": "low",
+    "reason": "A natural wax used as a glazing agent to coat confectionery and fruit; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of beeswax (E901) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e903": {
+    "eNumber": "E903",
+    "name": "Carnauba wax",
+    "tier": "low",
+    "reason": "A plant wax used as a glazing agent; EFSA set an ADI that estimated exposure stays within.",
+    "sources": [
+      { "name": "EFSA re-evaluation of carnauba wax (E903) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e904": {
+    "eNumber": "E904",
+    "name": "Shellac",
+    "tier": "low",
+    "reason": "A resin used as a glazing agent to coat confectionery and fruit; EFSA found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of shellac (E904) as a food additive", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e290": {
+    "eNumber": "E290",
+    "name": "Carbon dioxide",
+    "tier": "low",
+    "reason": "A packaging and carbonation gas; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of carbon dioxide (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e941": {
+    "eNumber": "E941",
+    "name": "Nitrogen",
+    "tier": "low",
+    "reason": "An inert packaging gas used to displace oxygen; regulators place no numeric intake limit on it.",
+    "sources": [
+      { "name": "JECFA evaluation of nitrogen (ADI not limited)", "url": "https://apps.who.int/food-additives-contaminants-jecfa-database/" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e1412": {
+    "eNumber": "E1412",
+    "name": "Distarch phosphate",
+    "tier": "low",
+    "reason": "A modified starch used as a thickener and stabiliser; EFSA re-evaluated the modified starches and found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of modified starches (E1404-E1451) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e1414": {
+    "eNumber": "E1414",
+    "name": "Acetylated distarch phosphate",
+    "tier": "low",
+    "reason": "A modified starch used as a thickener and stabiliser; EFSA re-evaluated the modified starches and found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of modified starches (E1404-E1451) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e1422": {
+    "eNumber": "E1422",
+    "name": "Acetylated distarch adipate",
+    "tier": "low",
+    "reason": "A modified starch used as a thickener and stabiliser; EFSA re-evaluated the modified starches and found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of modified starches (E1404-E1451) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
+    ],
+    "lastReviewed": "2026-07"
+  },
+  "en:e1442": {
+    "eNumber": "E1442",
+    "name": "Hydroxypropyl distarch phosphate",
+    "tier": "low",
+    "reason": "A modified starch used as a thickener and stabiliser; EFSA re-evaluated the modified starches and found no safety concern at reported uses.",
+    "sources": [
+      { "name": "EFSA re-evaluation of modified starches (E1404-E1451) as food additives", "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives" }
     ],
     "lastReviewed": "2026-07"
   }

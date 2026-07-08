@@ -11,6 +11,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchProduct } from "../_shared/off.ts";
+import { searchUsdaNutrients } from "../_shared/usda.ts";
 import type { ScoreOutput } from "../_shared/scoring/engine.ts";
 import {
   type Deps,
@@ -72,6 +73,11 @@ const deps: Deps = {
   },
 
   fetchOff: (barcode: string) => fetchProduct(barcode),
+
+  // USDA FDC enrichment reads USDA_API_KEY from the env (falls back to
+  // DEMO_KEY). Returns null on no-key / no-match / error — never throws.
+  enrichNutrients: (name: string, brand: string | null) =>
+    searchUsdaNutrients(name, { brand }),
 
   now: () => Date.now(),
 };

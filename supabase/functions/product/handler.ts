@@ -27,6 +27,7 @@ import additivesRisk from "../_shared/scoring/additives_risk.json" with {
   type: "json",
 };
 import type { OffProduct } from "../_shared/off.ts";
+import { isNutrientsThin, mergeNutrients, type UsdaMatch } from "../_shared/usda.ts";
 
 export const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -75,6 +76,13 @@ export interface Deps {
   ): Promise<void>;
   /** Open Food Facts lookup; null = not found. */
   fetchOff(barcode: string): Promise<OffProduct | null>;
+  /**
+   * Optional USDA FoodData Central enrichment (fuzzy name/brand match).
+   * Absent → no enrichment (OFF-only). Called ONLY on a cache miss/stale
+   * re-fetch when OFF nutrients are thin — never on a cache hit. Must resolve
+   * to null (not throw) on no-key / no-match / error.
+   */
+  enrichNutrients?(name: string, brand: string | null): Promise<UsdaMatch | null>;
   /** Clock, injectable for cache-TTL tests. */
   now(): number;
 }
@@ -288,6 +296,30 @@ export async function handleProduct(
     return json({ error: "not_found", needsOcr: true }, 404);
   }
 
+  // Enrich thin OFF nutrients from USDA FDC (miss/enrich path only — never on
+  // a cache hit). OFF takes precedence; USDA fills gaps. Never breaks the scan.
+  let nutriments: Record<string, unknown> = off.nutriments;
+  if (deps.enrichNutrients && isNutrientsThin(nutriments)) {
+    try {
+      const match = await deps.enrichNutrients(off.name, off.brand);
+      if (match) {
+        const { merged, filled } = mergeNutrients(nutriments, match.nutrients);
+        if (filled.length > 0) {
+          merged["_enrichment"] = {
+            source: "usda",
+            fdcId: match.fdcId,
+            description: match.description,
+            dataType: match.dataType,
+            fields: filled,
+          };
+          nutriments = merged;
+        }
+      }
+    } catch (_err) {
+      // USDA is best-effort; fall back to OFF nutrients unchanged.
+    }
+  }
+
   // Score it.
   const { tiers, unknown } = mapAdditiveTiers(off.additivesTags);
   const scoreOutput = appendUnknownAdditivesNote(
@@ -308,7 +340,7 @@ export async function handleProduct(
     source: "off",
     nova_group: off.novaGroup,
     nutriscore_grade: off.nutriscoreGrade,
-    nutrients: off.nutriments,
+    nutrients: nutriments,
     serving_size: off.servingSize,
     additives_tags: off.additivesTags,
     allergens_tags: off.allergensTags,

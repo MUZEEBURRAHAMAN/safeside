@@ -5,6 +5,7 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { SCORE_VERSION } from "../_shared/scoring/engine.ts";
 import type { OffProduct } from "../_shared/off.ts";
+import type { UsdaMatch } from "../_shared/usda.ts";
 import {
   type Deps,
   extractBarcode,
@@ -83,13 +84,20 @@ interface FakeState {
   offCalls: string[];
   upserts: Omit<ProductRow, "id">[];
   scoreInserts: { productId: string; band: string; score: number | null }[];
+  enrichCalls: { name: string; brand: string | null }[];
 }
 
 function makeDeps(opts: {
   cached?: { product: ProductRow; score: ScoreRow | null } | null;
   off?: OffProduct | null | Error;
+  enrich?: UsdaMatch | null | Error;
 }): { deps: Deps; state: FakeState } {
-  const state: FakeState = { offCalls: [], upserts: [], scoreInserts: [] };
+  const state: FakeState = {
+    offCalls: [],
+    upserts: [],
+    scoreInserts: [],
+    enrichCalls: [],
+  };
   const deps: Deps = {
     getProductWithScore: () => Promise.resolve(opts.cached ?? null),
     upsertProduct: (row) => {
@@ -114,6 +122,14 @@ function makeDeps(opts: {
     },
     now: () => NOW,
   };
+  // Only attach USDA enrichment when the test opts in.
+  if ("enrich" in opts) {
+    deps.enrichNutrients = (name, brand) => {
+      state.enrichCalls.push({ name, brand });
+      if (opts.enrich instanceof Error) return Promise.reject(opts.enrich);
+      return Promise.resolve(opts.enrich ?? null);
+    };
+  }
   return { deps, state };
 }
 
@@ -338,4 +354,112 @@ Deno.test("unreviewed additives score as low and are flagged, never invented", a
   assertEquals(additives.subScore, 100, "unreviewed must not add penalties");
   assertStringIncludes(additives.detail, "not yet in our review table");
   assertStringIncludes(additives.detail, "E9999");
+});
+
+// ---------------------------------------------------------------------------
+// USDA nutrient enrichment (miss path only, OFF precedence, best-effort)
+// ---------------------------------------------------------------------------
+
+const USDA_MATCH: UsdaMatch = {
+  fdcId: 12345,
+  description: "Hazelnut spread",
+  dataType: "Branded",
+  nutrients: {
+    "energy-kcal_100g": 539,
+    fat_100g: 30.9,
+    proteins_100g: 99, // must be ignored — OFF has none here, so it fills
+    sugars_100g: 12, // OFF already has 56.3 → OFF wins
+  },
+};
+
+Deno.test("enrichment: thin OFF nutrients are filled from USDA (OFF precedence)", async () => {
+  // OFF here has only sugars_100g (thin).
+  const { deps, state } = makeDeps({
+    cached: null,
+    off: offProduct({ nutriments: { sugars_100g: 56.3 } }),
+    enrich: USDA_MATCH,
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  assertEquals(res.status, 200);
+  await res.body?.cancel();
+
+  assertEquals(state.enrichCalls, [{ name: "Nutella", brand: "Ferrero" }]);
+  const stored = state.upserts[0].nutrients as Record<string, unknown>;
+  assertEquals(stored["sugars_100g"], 56.3, "OFF sugars preserved");
+  assertEquals(stored["energy-kcal_100g"], 539, "USDA fills energy");
+  assertEquals(stored["fat_100g"], 30.9, "USDA fills fat");
+  assertEquals(stored["proteins_100g"], 99, "USDA fills a genuine gap");
+  const prov = stored["_enrichment"] as Record<string, unknown>;
+  assertEquals(prov.source, "usda");
+  assertEquals(prov.fdcId, 12345);
+  assertEquals(
+    (prov.fields as string[]).sort(),
+    ["energy-kcal_100g", "fat_100g", "proteins_100g"],
+  );
+});
+
+Deno.test("enrichment: a full OFF nutrient table is NOT enriched", async () => {
+  const full = {
+    "energy-kcal_100g": 539,
+    sugars_100g: 56.3,
+    fat_100g: 30.9,
+    "saturated-fat_100g": 10.6,
+    proteins_100g: 6.3,
+    salt_100g: 0.107,
+  };
+  const { deps, state } = makeDeps({
+    cached: null,
+    off: offProduct({ nutriments: full }),
+    enrich: USDA_MATCH,
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  await res.body?.cancel();
+
+  assertEquals(state.enrichCalls.length, 0, "full data → no USDA call");
+  const stored = state.upserts[0].nutrients as Record<string, unknown>;
+  assertEquals("_enrichment" in stored, false);
+});
+
+Deno.test("enrichment: never runs on a fresh cache hit", async () => {
+  const fetchedAt = new Date(NOW - 5 * DAY_MS).toISOString();
+  const { deps, state } = makeDeps({
+    cached: cachedRow(fetchedAt),
+    enrich: USDA_MATCH,
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  assertEquals(res.status, 200);
+  await res.body?.cancel();
+  assertEquals(state.offCalls.length, 0);
+  assertEquals(state.enrichCalls.length, 0, "cache hit must not touch USDA");
+});
+
+Deno.test("enrichment: a USDA error never breaks the scan (OFF nutrients kept)", async () => {
+  const { deps, state } = makeDeps({
+    cached: null,
+    off: offProduct({ nutriments: { sugars_100g: 56.3 } }),
+    enrich: new Error("USDA down"),
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  assertEquals(res.status, 200, "scan still succeeds on OFF alone");
+  await res.body?.cancel();
+  const stored = state.upserts[0].nutrients as Record<string, unknown>;
+  assertEquals(stored, { sugars_100g: 56.3 }, "OFF nutrients unchanged");
+});
+
+Deno.test("enrichment: no USDA match leaves OFF nutrients unchanged", async () => {
+  const { deps, state } = makeDeps({
+    cached: null,
+    off: offProduct({ nutriments: { sugars_100g: 56.3 } }),
+    enrich: null,
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  await res.body?.cancel();
+  assertEquals(state.enrichCalls.length, 1);
+  const stored = state.upserts[0].nutrients as Record<string, unknown>;
+  assertEquals(stored, { sugars_100g: 56.3 });
 });

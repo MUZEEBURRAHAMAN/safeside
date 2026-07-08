@@ -24,7 +24,7 @@
 
 import type { LlmClient, LlmMessage } from "../llm.ts";
 
-export const KB_VERSION = "1.0";
+export const KB_VERSION = "1.1";
 export const DEFAULT_LOCALE = "en";
 
 export type RiskTier = "low" | "moderate" | "higher";

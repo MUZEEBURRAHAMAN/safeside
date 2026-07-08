@@ -26,20 +26,22 @@ supabase/
   migrations/
     20260707000000_initial_schema.sql  # profiles, products, score_results, pantry_items, events + RLS
     20260708000000_ingredient_kb.sql   # ingredient_kb + ingredient_explanations cache + RLS
+    20260708120000_kb_seed_v1_1.sql    # GENERATED — upserts the full KB seed (v1.1, 174 entries) into ingredient_kb
   tools/
-    build_kb_seed.py                    # regenerates the KB seed from additives_risk.json (stdlib; --check verifies sync)
+    build_kb_seed.py                    # regenerates the KB seed + SQL upsert from additives_risk.json (stdlib; --check verifies sync)
   functions/
     deno.json                          # test task + imports
     _shared/
       off.ts                           # Open Food Facts v2 client (User-Agent, field filter)
+      usda.ts                          # USDA FoodData Central client — nutrient enrichment (fuzzy name match, gap-fill)
       llm.ts                           # provider-agnostic OpenAI-compatible LLM client (injectable; null when no key)
       kb/
         kb.ts                          # KB types + guardrails + bounded LLM rewrite (pure, offline-testable)
         ingredient_kb_seed.json        # GENERATED — do not hand-edit; run tools/build_kb_seed.py
       scoring/
-        engine.ts                      # pure computeScore() — score_version 1.0.0
+        engine.ts                      # pure computeScore() — score_version 1.1.0
         weights.json                   # composite weights + mappings (data, not code)
-        additives_risk.json            # curated additive risk table v1.0 (regulatory sources)
+        additives_risk.json            # curated additive risk table v1.1 — 124 E-numbers (regulatory sources)
         calibration.json               # 50-product calibration set (from docs/Scoring_Calibration.xlsx)
     product/
       index.ts                         # Deno.serve wiring (supabase-js, service role)
@@ -52,9 +54,24 @@ supabase/
       handler.ts                       # pure handler — resolve KB → cache → rewrite → { ingredients: [...] }
 ```
 
+## Nutrient enrichment (USDA FoodData Central)
+
+Open Food Facts nutrient tables are often thin. On a cache **miss/stale re-fetch**
+only (never on a cache hit), when OFF is missing key macros the `product` handler
+enriches from **USDA FDC** (`_shared/usda.ts`) by fuzzy name/brand match and
+**merges**: OFF always wins where present, USDA fills the gaps. The merged row
+records provenance under `nutrients._enrichment` (`{ source: "usda", fdcId,
+description, dataType, fields }`). USDA is best-effort — no key, no match, or any
+error returns `null` and the scan still succeeds on OFF data alone. USDA data is
+public domain (CC0), so no attribution is required. The numeric **score is
+unaffected** (it derives from NOVA + Nutri-Score + additives); enrichment only
+improves the stored nutrient table. Set `USDA_API_KEY` (below); tests fall back to
+`DEMO_KEY` but never hit the network (fetch is injected).
+
 ## Ingredient knowledge base (the AI feature)
 
-`ingredient_kb` is the curated, versioned source of truth (`kb_version` 1.0). The
+`ingredient_kb` is the curated, versioned source of truth (`kb_version` 1.1 — 174
+entries: 124 additives + 50 common/base ingredients). The
 `/product/:id/ingredients` endpoint RETRIEVES vetted facts and the LLM only
 REWRITES them — it never generates facts (docs/AI_INGREDIENT_EXPLANATION.md).
 Guardrails enforced in code (`_shared/kb/kb.ts`), all unit-tested offline:
@@ -73,25 +90,28 @@ Guardrails enforced in code (`_shared/kb/kb.ts`), all unit-tested offline:
   `ingredient_explanations` by `(ingredient_id, kb_version, locale)`, so most
   scans cost ~$0 in AI.
 
-Regenerate / verify the seed:
+Regenerate / verify the seed (writes BOTH the JSON seed and the SQL upsert):
 
 ```sh
 python3 supabase/tools/build_kb_seed.py           # regenerate after editing additives_risk.json or the script
-python3 supabase/tools/build_kb_seed.py --check    # CI-friendly: exit 1 if the seed is stale
+python3 supabase/tools/build_kb_seed.py --check    # CI-friendly: exit 1 if the seed OR SQL is stale
 ```
 
-Seeding the DB (main session): load `_shared/kb/ingredient_kb_seed.json` into
-`ingredient_kb` with the service role (e.g. a one-off `supabase functions`/SQL
-insert, or `upsert` the `entries` array). Bumping content → bump `KB_VERSION`
-(in `_shared/kb/kb.ts` and the seed via the script) to invalidate cached
-rewrites.
+Seeding the DB (main session): apply the generated migration
+`migrations/20260708120000_kb_seed_v1_1.sql` (an idempotent `insert … on conflict
+(id) do update`) after the table-creating migration — e.g. `supabase db push`, or
+paste it into the SQL editor. It upserts all 174 entries with the service role.
+(Alternatively, load `_shared/kb/ingredient_kb_seed.json`'s `entries` array.)
+Bumping content → bump `KB_VERSION` in **both** `_shared/kb/kb.ts` and
+`tools/build_kb_seed.py` (`KB_VERSION` constant), then regenerate — this refreshes
+every seed row's `kb_version` and invalidates cached rewrites.
 
 ## Tests
 
-No network, no DB (the LLM is mocked). All 50 calibration products must match
-exactly, and the AI guardrail suite (no-hallucination, banned-language,
+No network, no DB (the LLM + fetch are mocked). All 50 calibration products must
+match exactly, and the AI guardrail suite (no-hallucination, banned-language,
 risk-consistency, unknown-ingredient, missing-LLM-key) + OCR parsing + KB-seed
-integrity all pass.
+integrity + USDA mapping/merge + product-handler enrichment all pass (97 tests).
 
 ```sh
 cd supabase/functions
@@ -120,8 +140,14 @@ supabase functions deploy ingredients
 supabase secrets set LLM_API_KEY=...            # enables the LLM rewrite
 supabase secrets set LLM_BASE_URL=...           # default https://api.groq.com/openai/v1
 supabase secrets set LLM_MODEL=...              # default llama-3.3-70b-versatile
-supabase secrets set USDA_API_KEY=...           # when USDA enrichment lands
+supabase secrets set USDA_API_KEY=...           # USDA FDC nutrient enrichment (free key: https://api.data.gov/signup/)
 ```
+
+**USDA env var** (nutrient enrichment, `_shared/usda.ts`):
+
+| Var | Default | Notes |
+|---|---|---|
+| `USDA_API_KEY` | `DEMO_KEY` | Free `api.data.gov` key, ~1,000 req/hr — cached hard (only hit on miss/enrich, never on a cache hit). Absent/empty → enrichment is skipped, OFF-only. |
 
 **LLM env vars** (OpenAI-compatible Chat Completions, provider-agnostic):
 
@@ -137,9 +163,10 @@ get a JWT before any account exists.
 
 ## Invariants worth knowing
 
-- `score_version` is `1.0.0` (`engine.ts`). Bump it whenever `weights.json` or
-  `additives_risk.json` change; the cache treats older versions as stale and
-  rescoring happens on next fetch. Log changes in `MEMORY.md`.
+- `score_version` is `1.1.0` (`engine.ts`) — bumped from 1.0.0 when
+  `additives_risk.json` grew to v1.1 (124 reviewed E-numbers, up from 51). Bump it
+  whenever `weights.json` or `additives_risk.json` change; the cache treats older
+  versions as stale and rescoring happens on next fetch. Log changes in `MEMORY.md`.
 - `products` / `score_results` are a global cache: readable by any signed-in
   (incl. anonymous) session, writable only via the service role. Everything
   user-owned is RLS'd to `auth.uid()`.

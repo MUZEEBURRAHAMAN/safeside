@@ -31,12 +31,13 @@ import json
 import sys
 from pathlib import Path
 
-KB_VERSION = "1.0"
+KB_VERSION = "1.1"
 CONFIDENCE = "high"
 
 ROOT = Path(__file__).resolve().parents[1]  # .../supabase
 ADDITIVES_RISK = ROOT / "functions" / "_shared" / "scoring" / "additives_risk.json"
 SEED_OUT = ROOT / "functions" / "_shared" / "kb" / "ingredient_kb_seed.json"
+SQL_OUT = ROOT / "migrations" / "20260708120000_kb_seed_v1_1.sql"
 
 # ---------------------------------------------------------------------------
 # Additive category templates — FUNCTIONAL descriptions only (no health claims).
@@ -108,6 +109,31 @@ CATEGORY_TEMPLATES = {
         "why_used": "Holds moisture so foods stay soft.",
         "found_in": ["soft baked goods", "confectionery", "chewing gum"],
     },
+    "polyol": {
+        "what": "A sugar alcohol (polyol) used as a sweetener.",
+        "why_used": "Adds sweetness and bulk with fewer calories than sugar; also helps hold moisture.",
+        "found_in": ["sugar-free sweets", "chewing gum", "sugar-free chocolate", "baked goods"],
+    },
+    "modified_starch": {
+        "what": "A modified starch.",
+        "why_used": "A starch treated so it thickens or stays stable during cooking, freezing, or storage.",
+        "found_in": ["sauces", "soups", "ready meals", "desserts"],
+    },
+    "glazing": {
+        "what": "A glazing agent.",
+        "why_used": "Forms a shiny protective coating on the surface of a food.",
+        "found_in": ["confectionery", "chocolate", "coated fruit", "supplements"],
+    },
+    "gas": {
+        "what": "A food-grade gas.",
+        "why_used": "Used to carbonate drinks or to protect packaged food by replacing oxygen.",
+        "found_in": ["fizzy drinks", "packaged fresh foods", "bagged snacks"],
+    },
+    "anti_caking": {
+        "what": "An anti-caking agent.",
+        "why_used": "Keeps powders and granules free-flowing and stops them clumping.",
+        "found_in": ["powdered foods", "seasonings", "grated cheese", "supplements"],
+    },
     "generic": {
         "what": "A food additive.",
         "why_used": "Serves a technical role such as texture, colour, or shelf life.",
@@ -122,8 +148,23 @@ def classify_additive(name: str, reason: str) -> str:
     # Order matters: most specific first.
     if "flavour enhancer" in text or "glutamat" in text or "umami" in text:
         return "flavour_enhancer"
-    if "sweetener" in text or "aspartame" in text or "sucralose" in text or "acesulfame" in text:
+    # Polyols before the generic "sweetener" branch (they have bulk + calories).
+    if "polyol" in text or "sugar alcohol" in text:
+        return "polyol"
+    if "sweetener" in text or "aspartame" in text or "sucralose" in text or "acesulfame" in text \
+            or "stevia" in text or "steviol" in text:
         return "sweetener"
+    # Modified starch before "phosphate" (e.g. "distarch phosphate" is a starch).
+    if "starch" in text:
+        return "modified_starch"
+    if "glazing" in text or "shellac" in text or "beeswax" in text or "carnauba" in text \
+            or "wax" in text:
+        return "glazing"
+    if "carbon dioxide" in text or "nitrogen" in text or "inert gas" in text \
+            or "packaging gas" in text:
+        return "gas"
+    if "anti-caking" in text or "silicon dioxide" in text:
+        return "anti_caking"
     if "flour treatment" in text or "bromate" in text:
         return "flour_treatment"
     if "phosphate" in text or "phosphoric" in text or "diphosphate" in text:
@@ -159,9 +200,21 @@ ADDITIVE_OVERRIDES: dict[str, dict] = {
     "en:e120": {
         "who_should_avoid": ["people with a known carmine or cochineal sensitivity"],
     },
+    "en:e150a": {
+        "what": "A plain caramel colour (made by heating carbohydrates).",
+        "why_used": "Adds a brown colour.",
+    },
+    "en:e150c": {
+        "what": "An ammonia caramel colour.",
+        "why_used": "Adds a brown colour, common in savoury foods and some drinks.",
+    },
     "en:e150d": {
         "what": "A caramel colour (the sulphite ammonia type).",
         "why_used": "Adds a brown colour, most familiar from colas.",
+    },
+    "en:e172": {
+        "what": "Iron-oxide mineral colours (yellow, red, black).",
+        "why_used": "Add yellow, red, brown, or black colour.",
     },
     "en:e171": {
         "what": "A white mineral colour (titanium dioxide).",
@@ -270,6 +323,30 @@ def build_additive_entries(risk_table: dict) -> list[dict]:
 # Language is neutral, dose-aware, and free of the banned fear words.
 # ---------------------------------------------------------------------------
 USDA = {"name": "USDA FoodData Central", "url": "https://fdc.nal.usda.gov/"}
+WHO_SUGARS = {
+    "name": "WHO guideline: sugars intake for adults and children, 2015",
+    "url": "https://www.who.int/publications/i/item/9789241549028",
+}
+WHO_SATFAT = {
+    "name": "WHO guideline: saturated and trans-fatty acid intake, 2023",
+    "url": "https://www.who.int/publications/i/item/9789240073630",
+}
+WHO_FORTIFICATION = {
+    "name": "WHO guidelines on food fortification with micronutrients",
+    "url": "https://www.who.int/publications/i/item/9241594012",
+}
+EFSA_DRV = {
+    "name": "EFSA Dietary Reference Values for nutrients",
+    "url": "https://www.efsa.europa.eu/en/topics/topic/dietary-reference-values",
+}
+EFSA_FLAVOURINGS = {
+    "name": "EFSA information on food flavourings",
+    "url": "https://www.efsa.europa.eu/en/topics/topic/flavourings",
+}
+EFSA_STARCH = {
+    "name": "EFSA re-evaluation of modified starches as food additives",
+    "url": "https://www.efsa.europa.eu/en/topics/topic/food-additives",
+}
 
 COMMON_INGREDIENTS: list[dict] = [
     {
@@ -505,6 +582,276 @@ COMMON_INGREDIENTS: list[dict] = [
         "found_in": ["bread", "baked goods", "spreads", "fermented foods"],
         "sources": [USDA],
     },
+    {
+        "id": "en:soybean-oil",
+        "names": ["Soybean oil", "Soya oil", "Soya bean oil"],
+        "what": "A vegetable oil pressed from soybeans.",
+        "why_used": "A neutral cooking oil used for frying, baking, and dressings.",
+        "safety": "Soybean oil is safe to eat and is mostly unsaturated fat.",
+        "who_should_avoid": ["people with a soya allergy may want to check with a clinician, though refined soybean oil is usually tolerated"],
+        "found_in": ["cooking oils", "dressings", "spreads", "processed foods"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:coconut-oil",
+        "names": ["Coconut oil"],
+        "what": "An oil pressed from coconut flesh.",
+        "why_used": "Adds texture and stays solid at room temperature.",
+        "safety": "Coconut oil is safe to eat; it is high in saturated fat, which health bodies suggest limiting.",
+        "who_should_avoid": ["people advised to limit saturated fat"],
+        "misconceptions": ["Claims that coconut oil is a uniquely healthy fat are not well supported; it is still high in saturated fat"],
+        "found_in": ["baked goods", "spreads", "confectionery", "cooking oils"],
+        "sources": [WHO_SATFAT, USDA],
+    },
+    {
+        "id": "en:maize",
+        "names": ["Maize", "Corn", "Sweetcorn"],
+        "what": "A cereal grain (corn).",
+        "why_used": "A staple grain eaten whole or milled and used as a base for many foods.",
+        "safety": "Maize (corn) is a safe, widely eaten grain.",
+        "found_in": ["cereals", "snacks", "tortillas", "canned vegetables"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:barley",
+        "names": ["Barley", "Pearl barley"],
+        "what": "A cereal grain.",
+        "why_used": "A staple grain used in foods and to make malt.",
+        "safety": "Barley is a safe whole grain; it contains gluten.",
+        "who_should_avoid": ["people with coeliac disease or who avoid gluten"],
+        "found_in": ["soups", "cereals", "malt", "bread"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:rye",
+        "names": ["Rye", "Rye flour"],
+        "what": "A cereal grain, often milled into flour.",
+        "why_used": "Used in breads and crispbreads.",
+        "safety": "Rye is a safe whole grain; it contains gluten.",
+        "who_should_avoid": ["people with coeliac disease or who avoid gluten"],
+        "found_in": ["rye bread", "crispbread", "cereals"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:potato-starch",
+        "names": ["Potato starch"],
+        "what": "Starch extracted from potatoes.",
+        "why_used": "Thickens and binds and adds a light texture.",
+        "safety": "Potato starch is a safe, common food ingredient.",
+        "found_in": ["sauces", "baked goods", "gluten-free foods", "soups"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:modified-starch",
+        "names": ["Modified starch", "Modified corn starch", "Modified maize starch", "Food starch modified"],
+        "what": "A starch that has been physically or chemically treated.",
+        "why_used": "Thickens or stabilises foods and stays stable during cooking, freezing, or storage.",
+        "safety": "Modified starches are safe, common food ingredients; EFSA re-evaluated them and found no safety concern at reported uses.",
+        "misconceptions": ["'Modified' here means the starch was processed to work better in food, not that it is genetically modified"],
+        "found_in": ["sauces", "soups", "ready meals", "desserts"],
+        "sources": [EFSA_STARCH, USDA],
+    },
+    {
+        "id": "en:cream",
+        "names": ["Cream", "Double cream", "Single cream"],
+        "what": "The fat-rich part of milk.",
+        "why_used": "Adds richness and texture.",
+        "safety": "Cream is a safe dairy food; it is a milk product and is high in saturated fat.",
+        "who_should_avoid": ["people with a milk allergy", "people advised to limit saturated fat"],
+        "found_in": ["desserts", "sauces", "baked goods", "dairy products"],
+        "sources": [WHO_SATFAT, USDA],
+    },
+    {
+        "id": "en:cheese",
+        "names": ["Cheese", "Cheddar", "Mozzarella"],
+        "what": "A dairy food made by curdling milk.",
+        "why_used": "Adds flavour, protein, and texture.",
+        "safety": "Cheese is a safe, nutritious dairy food for most people; it is a milk product and can be high in salt and saturated fat.",
+        "who_should_avoid": ["people with a milk allergy", "people advised to limit sodium or saturated fat"],
+        "found_in": ["ready meals", "sandwiches", "pizza", "snacks"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:yogurt",
+        "names": ["Yogurt", "Yoghurt"],
+        "what": "A dairy food made by fermenting milk.",
+        "why_used": "Adds flavour, protein, and a creamy texture.",
+        "safety": "Yogurt is a safe, nutritious dairy food for most people; it is a milk product.",
+        "who_should_avoid": ["people with a milk allergy"],
+        "found_in": ["dairy aisle", "desserts", "drinks", "dips"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:soybean",
+        "names": ["Soy", "Soya", "Soybeans", "Soya beans"],
+        "what": "A legume (soybean) and foods made from it.",
+        "why_used": "A plant protein used whole or as an ingredient in many foods.",
+        "safety": "Soy is a safe, protein-rich food for most people; it is a common allergen.",
+        "who_should_avoid": ["people with a soya allergy"],
+        "found_in": ["tofu", "plant drinks", "meat alternatives", "processed foods"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:soy-protein",
+        "names": ["Soy protein", "Soya protein", "Soy protein isolate", "Soya protein isolate"],
+        "what": "Protein extracted from soybeans.",
+        "why_used": "Adds protein and structure, often in meat alternatives.",
+        "safety": "Soy protein is safe for most people; it is a common allergen.",
+        "who_should_avoid": ["people with a soya allergy"],
+        "found_in": ["meat alternatives", "protein products", "processed foods", "cereal bars"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:pea-protein",
+        "names": ["Pea protein", "Pea protein isolate"],
+        "what": "Protein extracted from peas.",
+        "why_used": "Adds protein and structure, often in plant-based foods.",
+        "safety": "Pea protein is a safe, plant-based protein.",
+        "found_in": ["meat alternatives", "plant drinks", "protein products", "cereal bars"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:gelatin",
+        "names": ["Gelatin", "Gelatine"],
+        "what": "A protein set from animal collagen.",
+        "why_used": "Sets and thickens foods into a gel.",
+        "safety": "Gelatin is a safe, common food ingredient; it comes from animals, so it is not suitable for vegetarians or vegans.",
+        "who_should_avoid": ["vegetarians and vegans, because it is an animal product"],
+        "found_in": ["jelly", "gummy sweets", "desserts", "some yogurts"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:fructose",
+        "names": ["Fructose", "Fruit sugar"],
+        "what": "A simple sugar found naturally in fruit and honey.",
+        "why_used": "Adds sweetness.",
+        "safety": "Fructose is a form of sugar; the WHO advice on limiting free sugars applies to it when it is added to foods.",
+        "who_should_avoid": ["people managing diabetes may want to watch total sugars"],
+        "found_in": ["soft drinks", "sweets", "baked goods", "sauces"],
+        "sources": [WHO_SUGARS, USDA],
+    },
+    {
+        "id": "en:dextrose",
+        "names": ["Dextrose", "Glucose", "Grape sugar"],
+        "what": "A simple sugar (glucose), often made from maize.",
+        "why_used": "Adds sweetness and energy and is used in baking and sports foods.",
+        "safety": "Dextrose (glucose) is a form of sugar; the WHO advice on limiting free sugars applies to it.",
+        "who_should_avoid": ["people managing diabetes may want to watch total sugars"],
+        "found_in": ["sports drinks", "sweets", "baked goods", "processed foods"],
+        "sources": [WHO_SUGARS, USDA],
+    },
+    {
+        "id": "en:maltodextrin",
+        "names": ["Maltodextrin"],
+        "what": "A carbohydrate made from starch such as maize or wheat.",
+        "why_used": "Adds bulk or texture, carries flavours, and gives quick energy.",
+        "safety": "Maltodextrin is a safe, common food ingredient; it raises blood glucose quickly, like other starches and sugars.",
+        "who_should_avoid": ["people managing diabetes may want to note it affects blood glucose"],
+        "found_in": ["sports foods", "sauces", "snacks", "processed foods"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:molasses",
+        "names": ["Molasses", "Treacle", "Blackstrap molasses"],
+        "what": "A thick syrup left from refining sugar.",
+        "why_used": "Adds sweetness, colour, and a strong flavour.",
+        "safety": "Molasses is a form of sugar; the WHO advice on limiting free sugars applies to it.",
+        "who_should_avoid": ["people managing diabetes may want to watch total sugars"],
+        "found_in": ["baked goods", "sauces", "cereals", "confectionery"],
+        "sources": [WHO_SUGARS, USDA],
+    },
+    {
+        "id": "en:vinegar",
+        "names": ["Vinegar", "Spirit vinegar", "White vinegar"],
+        "what": "A sour liquid made by fermenting alcohol into acetic acid.",
+        "why_used": "Adds a tart flavour and helps preserve foods like pickles.",
+        "safety": "Vinegar is a safe, common food ingredient.",
+        "found_in": ["dressings", "sauces", "pickles", "condiments"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:baking-powder",
+        "names": ["Baking powder"],
+        "what": "A raising-agent blend, usually a carbonate plus an acid salt.",
+        "why_used": "Releases gas so baked goods rise.",
+        "safety": "Baking powder is a safe, common baking ingredient.",
+        "found_in": ["cakes", "biscuits", "self-raising products", "batters"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:tomato-paste",
+        "names": ["Tomato paste", "Tomato purée", "Tomato puree", "Concentrated tomato"],
+        "what": "Tomatoes cooked down and concentrated.",
+        "why_used": "Adds tomato flavour, colour, and body.",
+        "safety": "Tomato paste is a safe food made from tomatoes.",
+        "found_in": ["sauces", "soups", "pizza", "ready meals"],
+        "sources": [USDA],
+    },
+    {
+        "id": "en:natural-flavouring",
+        "names": ["Natural flavouring", "Natural flavour", "Flavouring", "Flavour", "Flavourings"],
+        "what": "Flavour ingredients used in small amounts to give or boost taste.",
+        "why_used": "Adds or rounds out the taste of a food.",
+        "safety": "Flavourings are used in very small amounts and are regulated for safety; their specific identities are often not listed on the label.",
+        "misconceptions": ["'Natural flavouring' means the flavour comes from a natural source; it does not tell you the exact ingredient"],
+        "found_in": ["soft drinks", "snacks", "dairy", "many processed foods"],
+        "sources": [EFSA_FLAVOURINGS],
+    },
+    {
+        "id": "en:folic-acid",
+        "names": ["Folic acid", "Folate", "Vitamin B9"],
+        "what": "A B vitamin (folate) added to foods.",
+        "why_used": "Fortifies foods to help people meet their folate needs.",
+        "safety": "Folic acid is safe at the levels used to fortify foods; it is especially important before and during early pregnancy.",
+        "found_in": ["fortified flour", "breakfast cereals", "bread"],
+        "sources": [WHO_FORTIFICATION, EFSA_DRV],
+    },
+    {
+        "id": "en:iron",
+        "names": ["Iron", "Ferrous fumarate", "Ferrous sulphate", "Reduced iron"],
+        "what": "A mineral added to fortify foods.",
+        "why_used": "Fortifies foods to help people meet their iron needs.",
+        "safety": "Added iron is safe at the levels used to fortify foods; iron is an essential mineral.",
+        "found_in": ["fortified cereals", "fortified flour", "plant drinks"],
+        "sources": [WHO_FORTIFICATION, USDA],
+    },
+    {
+        "id": "en:calcium",
+        "names": ["Calcium", "Added calcium", "Calcium (fortified)"],
+        "what": "A mineral added to fortify foods.",
+        "why_used": "Fortifies foods such as plant drinks and flour with calcium.",
+        "safety": "Added calcium is safe at the levels used to fortify foods; calcium is an essential mineral for bones.",
+        "found_in": ["plant drinks", "fortified flour", "breakfast cereals"],
+        "sources": [WHO_FORTIFICATION, EFSA_DRV],
+    },
+    {
+        "id": "en:niacin",
+        "names": ["Niacin", "Vitamin B3", "Nicotinamide"],
+        "what": "A B vitamin added to foods.",
+        "why_used": "Fortifies foods to help people meet their niacin needs.",
+        "safety": "Niacin is safe at the levels used to fortify foods; it is an essential B vitamin.",
+        "found_in": ["fortified flour", "breakfast cereals", "bread"],
+        "sources": [EFSA_DRV, USDA],
+    },
+    {
+        "id": "en:vitamin-d",
+        "names": ["Vitamin D", "Vitamin D3", "Cholecalciferol"],
+        "what": "A vitamin added to fortify some foods.",
+        "why_used": "Fortifies foods such as spreads and cereals with vitamin D.",
+        "safety": "Vitamin D is safe at the levels used to fortify foods; it supports bone health.",
+        "found_in": ["fortified spreads", "breakfast cereals", "plant drinks"],
+        "sources": [EFSA_DRV, USDA],
+    },
+    {
+        "id": "en:vitamin-c",
+        "names": ["Vitamin C", "L-ascorbic acid", "Ascorbic acid (added)"],
+        "what": "A vitamin added to foods, also used as an antioxidant.",
+        "why_used": "Fortifies foods and protects colour and flavour.",
+        "safety": "Vitamin C is safe at the levels used in foods; it is an essential vitamin.",
+        "misconceptions": ["As an added antioxidant it can appear on labels as E300; it is the same vitamin C"],
+        "found_in": ["fortified drinks", "cereals", "juices"],
+        "sources": [EFSA_DRV, USDA],
+    },
 ]
 
 
@@ -551,28 +898,110 @@ def serialize(seed: dict) -> str:
     return json.dumps(seed, indent=2, ensure_ascii=False) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# SQL upsert migration — generated from the same seed so it can never drift.
+# ---------------------------------------------------------------------------
+def _sql_str(v) -> str:
+    if v is None:
+        return "null"
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def _sql_text_array(items) -> str:
+    if not items:
+        return "array[]::text[]"
+    return "array[" + ", ".join(_sql_str(i) for i in items) + "]::text[]"
+
+
+def _sql_jsonb(obj) -> str:
+    return "'" + json.dumps(obj, ensure_ascii=False).replace("'", "''") + "'::jsonb"
+
+
+def build_sql(seed: dict) -> str:
+    entries = seed["entries"]
+    rows = []
+    for e in entries:
+        rows.append(
+            "  (" + ", ".join([
+                _sql_str(e["id"]),
+                _sql_text_array(e["names"]),
+                _sql_str(e["what"]),
+                _sql_str(e["why_used"]),
+                _sql_str(e["safety"]),
+                _sql_str(e["risk_tier"]),
+                _sql_text_array(e["who_should_avoid"]),
+                _sql_text_array(e["misconceptions"]),
+                _sql_text_array(e["found_in"]),
+                _sql_jsonb(e["sources"]),
+                _sql_str(e["confidence"]),
+                _sql_str(e["last_reviewed"]),
+                _sql_str(e["kb_version"]),
+            ]) + ")"
+        )
+    header = (
+        "-- =============================================================================\n"
+        f"-- GENERATED by supabase/tools/build_kb_seed.py --sql — do not hand-edit.\n"
+        f"-- Upserts the full ingredient KB seed (kb_version {KB_VERSION}, "
+        f"{len(entries)} entries) into ingredient_kb.\n"
+        "-- Apply AFTER 20260708000000_ingredient_kb.sql (which creates the table + enums).\n"
+        "-- Idempotent: re-running upserts by id and refreshes every field.\n"
+        "-- Additive risk_tier values equal supabase/functions/_shared/scoring/\n"
+        "-- additives_risk.json (one source of truth). Regenerate with:\n"
+        "--   python3 supabase/tools/build_kb_seed.py\n"
+        "-- =============================================================================\n\n"
+    )
+    body = (
+        "insert into ingredient_kb\n"
+        "  (id, names, what, why_used, safety, risk_tier, who_should_avoid,\n"
+        "   misconceptions, found_in, sources, confidence, last_reviewed, kb_version)\n"
+        "values\n"
+        + ",\n".join(rows)
+        + "\non conflict (id) do update set\n"
+        "  names            = excluded.names,\n"
+        "  what             = excluded.what,\n"
+        "  why_used         = excluded.why_used,\n"
+        "  safety           = excluded.safety,\n"
+        "  risk_tier        = excluded.risk_tier,\n"
+        "  who_should_avoid = excluded.who_should_avoid,\n"
+        "  misconceptions   = excluded.misconceptions,\n"
+        "  found_in         = excluded.found_in,\n"
+        "  sources          = excluded.sources,\n"
+        "  confidence       = excluded.confidence,\n"
+        "  last_reviewed    = excluded.last_reviewed,\n"
+        "  kb_version       = excluded.kb_version,\n"
+        "  updated_at       = now();\n"
+    )
+    return header + body
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="verify the seed is in sync; exit 1 if not")
+    parser.add_argument("--check", action="store_true", help="verify the seed + SQL are in sync; exit 1 if not")
     args = parser.parse_args()
 
     seed = build_seed()
     rendered = serialize(seed)
+    sql = build_sql(seed)
 
     if args.check:
         if not SEED_OUT.exists():
             print(f"MISSING: {SEED_OUT}", file=sys.stderr)
             return 1
-        current = SEED_OUT.read_text()
-        if current != rendered:
+        if SEED_OUT.read_text() != rendered:
             print("OUT OF SYNC: regenerate with `python3 supabase/tools/build_kb_seed.py`", file=sys.stderr)
             return 1
-        print(f"OK: {seed['_meta']['count']} entries in sync")
+        if not SQL_OUT.exists() or SQL_OUT.read_text() != sql:
+            print("OUT OF SYNC (SQL): regenerate with `python3 supabase/tools/build_kb_seed.py`", file=sys.stderr)
+            return 1
+        print(f"OK: {seed['_meta']['count']} entries in sync (JSON + SQL)")
         return 0
 
     SEED_OUT.parent.mkdir(parents=True, exist_ok=True)
     SEED_OUT.write_text(rendered)
+    SQL_OUT.parent.mkdir(parents=True, exist_ok=True)
+    SQL_OUT.write_text(sql)
     print(f"Wrote {seed['_meta']['count']} entries to {SEED_OUT}")
+    print(f"Wrote upsert migration to {SQL_OUT}")
     return 0
 
 
