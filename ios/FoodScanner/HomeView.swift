@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// Home (MASTER_PLAN Phase 2): big Scan button, recent scans (the guest-first
-/// pantry), and a couple of trending healthy products. Docs:
-/// docs/DESIGN_SYSTEM.md §5.4 (cards), §5.9 (states — empty/loading/error),
-/// §8 (accessibility), docs/COPY_DECK.md (pantry copy).
+/// Home — rebuilt to Design System v3 ("Calm Intelligence", docs/DESIGN_SYSTEM_V3.md):
+/// light-first mint-white canvas, white floating cards, a bold Space Grotesk
+/// hero headline, a full-width green Scan CTA card as the screen's anchor, an
+/// optional calm daily-insight tile, and Recent Scans / Trending Healthy as a
+/// 2-column product-card grid with grade dots (§5.4). Behavior is unchanged
+/// from the previous build: guest-first, `.task(id:)`-driven loads, the
+/// scanner `fullScreenCover`, and favorites — only the visual language moved.
 struct HomeView: View {
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showScanner = false
     @State private var pantryFilter: PantryFilter = .recent
 
@@ -31,39 +35,62 @@ struct HomeView: View {
         }
     }
 
+    /// A calm, ED-safe one-liner for the optional daily-insight tile (v3 §5.7):
+    /// "N scans this week" when there's recent activity, otherwise a neutral
+    /// "N products saved" — never a streak/guilt mechanic, and omitted
+    /// entirely (by returning `nil`) when the pantry has nothing to say yet.
+    private var dailyInsightText: String? {
+        guard !pantryService.entries.isEmpty else { return nil }
+        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? .distantPast
+        let recentCount = pantryService.entries.filter { $0.item.firstScannedAt >= sevenDaysAgo }.count
+        if recentCount > 0 {
+            return recentCount == 1 ? "1 scan this week" : "\(recentCount) scans this week"
+        }
+        let total = pantryService.entries.count
+        return total == 1 ? "1 product saved" : "\(total) products saved"
+    }
+
+    /// Two columns normally; a single column once Dynamic Type crosses into
+    /// the accessibility range, so long names/scores always have room to
+    /// grow instead of being crushed into a too-narrow column (§7/§8: "grid
+    /// reflows, cards grow").
+    private var gridColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.flexible(), spacing: Theme.Space.s4), GridItem(.flexible())]
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s5) {
-                    Text("What's really in your food?")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .padding(.top, Theme.Space.s4)
+                VStack(alignment: .leading, spacing: Theme.Space.s6) {
+                    heroHeader
 
-                    // Primary action: Scan
-                    Button { showScanner = true } label: {
-                        HStack {
-                            Image(systemName: "barcode.viewfinder").font(.title2)
-                            Text("Scan a product").font(.headline)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .foregroundStyle(Theme.onGreen)
-                        .background(Theme.greenDeep)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+                    ScanCTACard { showScanner = true }
+
+                    if let dailyInsightText {
+                        DailyInsightTile(text: dailyInsightText)
                     }
-                    .accessibilityHint("Opens the scanner to scan a barcode.")
 
-                    pantryHeader
+                    VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                        pantryHeader
+                        pantrySection
+                    }
 
-                    pantrySection
-
-                    trendingSection
+                    VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                        Text("Trending healthy")
+                            .font(DisplayType.h2)
+                            .foregroundStyle(Theme.textPrimary)
+                        trendingContent
+                    }
                 }
-                .padding(.horizontal, Theme.Space.s4)
-                .padding(.bottom, Theme.Space.s5)
+                .padding(.horizontal, 20)
+                .padding(.top, Theme.Space.s4)
+                .padding(.bottom, Theme.Space.s6)
             }
             .background(Theme.canvas)
             .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(.inline)
             .task(id: session.userID) {
                 // Re-runs once the anonymous session's userID resolves
                 // (bootstrap is async), and whenever it changes (e.g. later
@@ -85,42 +112,46 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Hero
+
+    /// The screen's one bold Space Grotesk display moment (v3 §3: "max one
+    /// display per screen region"), matching docs/COPY_DECK.md's intro line.
+    private var heroHeader: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            Text("What's really in your food?")
+                .font(DisplayType.hero)
+                .foregroundStyle(Theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text("Scan any barcode for a clear, sourced score.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
     // MARK: - Pantry (recent scans / favorites)
 
     private var pantryHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s3) {
             Text(pantryFilter == .recent ? "Recent scans" : "Favorites")
-                .font(.headline)
+                .font(DisplayType.h2)
                 .foregroundStyle(Theme.textPrimary)
             Spacer(minLength: Theme.Space.s2)
             filterChips
         }
     }
 
-    /// Filter chips (docs/DESIGN_SYSTEM.md §5.5): `radius.full`, selected =
-    /// `brand.green` fill. Only meaningful once there's at least one scan —
+    /// Pill filter chips (v3 §5.8: `radius.full`, selected = `brand.green`
+    /// fill, ink label). Only meaningful once there's at least one scan —
     /// hidden on a totally empty pantry so there's nothing to filter.
     @ViewBuilder
     private var filterChips: some View {
         if !pantryService.entries.isEmpty {
             HStack(spacing: Theme.Space.s2) {
                 ForEach(PantryFilter.allCases) { filter in
-                    let isSelected = pantryFilter == filter
-                    Button {
+                    FilterChipButton(label: filter.label, isSelected: pantryFilter == filter) {
                         pantryFilter = filter
-                    } label: {
-                        Text(filter.label)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(isSelected ? Theme.ink : Theme.textSecondary)
-                            .padding(.horizontal, Theme.Space.s3)
-                            .frame(minHeight: 32)
-                            .background(isSelected ? Theme.green : Theme.surface, in: Capsule())
-                            .overlay(
-                                Capsule().strokeBorder(isSelected ? .clear : Theme.border, lineWidth: 1)
-                            )
                     }
-                    .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-                    .accessibilityLabel("\(filter.label) filter")
                 }
             }
         }
@@ -129,7 +160,7 @@ struct HomeView: View {
     @ViewBuilder
     private var pantrySection: some View {
         if pantryService.isLoading && pantryService.entries.isEmpty {
-            PantrySkeletonList()
+            ProductGridSkeleton()
         } else if let error = pantryService.loadError, pantryService.entries.isEmpty {
             StateCard(
                 message: error,
@@ -144,25 +175,15 @@ struct HomeView: View {
             // dead end: point back at how to favorite something.
             StateCard(message: "No favorites yet — tap the heart on a product to save it here.")
         } else {
-            VStack(spacing: Theme.Space.s3) {
+            LazyVGrid(columns: gridColumns, spacing: Theme.Space.s4) {
                 ForEach(filteredEntries) { entry in
-                    PantryRowContent(entry: entry)
+                    ProductCard(product: entry.asProduct())
                 }
             }
         }
     }
 
     // MARK: - Trending healthy
-
-    private var trendingSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s3) {
-            Text("Trending healthy")
-                .font(.headline)
-                .foregroundStyle(Theme.textPrimary)
-
-            trendingContent
-        }
-    }
 
     @ViewBuilder
     private var trendingContent: some View {
@@ -180,253 +201,279 @@ struct HomeView: View {
                 .foregroundStyle(Theme.textSecondary)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: Theme.Space.s3) {
+                HStack(alignment: .top, spacing: Theme.Space.s4) {
                     ForEach(pantryService.trending) { entry in
-                        TrendingCardContent(entry: entry)
+                        ProductCard(product: entry.asProduct(), fixedWidth: 172)
                     }
                 }
                 .padding(.vertical, Theme.Space.s1)
+                // A little breathing room so the card shadow/elevation isn't
+                // visually clipped at the scroll view's leading/trailing edge.
+                .padding(.horizontal, 2)
             }
         }
     }
 }
 
-// MARK: - Compact score indicator
+// MARK: - Motion — card press
 
-/// A compact score indicator for dense list/card contexts (pantry rows,
-/// trending cards) — deliberately smaller and less repetitive than
-/// `ScoreBadge` (which is sized for the result screen's brand moment, §5.2):
-/// the number appears once, inside the disc, instead of being repeated as
-/// "N / 100" underneath. It's paired with the same word label `ScoreBadge`
-/// uses, so color is never the sole signal (§8). Band colors mirror
-/// `ScoreBadge`'s mapping exactly — never red for `.low`, per CLAUDE.md's
+/// A calm press-scale for card taps (v3 §6): 0.97 scale, quick ease-out, no
+/// bounce, routed through `DesignKit.Motion` so Reduce Motion is honored in
+/// one place — a static tap is the Reduce-Motion-safe path.
+private struct CardPressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(Motion.respecting(Motion.quick, reduceMotion), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Scan CTA card (Home's anchor, v3 §5.6)
+
+/// The full-width green Scan CTA — Home's primary action and the screen's
+/// anchor, not a plain button in a list. Decorative glyphs (icon circle,
+/// trailing chevron) are hidden from VoiceOver; the button carries one clear
+/// spoken label + hint instead.
+private struct ScanCTACard: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Space.s4) {
+                ZStack {
+                    Circle().fill(Theme.onGreen.opacity(0.18)).frame(width: 56, height: 56)
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(Theme.onGreen)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scan a product")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Theme.onGreen)
+                    Text("Get a clear, sourced score")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.onGreen.opacity(0.85))
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.onGreen.opacity(0.8))
+            }
+            .padding(Theme.Space.s5)
+            .frame(maxWidth: .infinity, minHeight: 96)
+            .background(Theme.greenDeep, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        }
+        .buttonStyle(CardPressButtonStyle())
+        .elevation(.floating)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Scan a product")
+        .accessibilityHint("Opens the scanner to scan a barcode and get a clear, sourced score.")
+    }
+}
+
+// MARK: - Daily-insight tile (v3 §5.7 — optional, ED-safe)
+
+/// A calm, one-line stat card ("3 scans this week" / "12 products saved").
+/// Never a streak or guilt mechanic — purely a friendly anchor, and `HomeView`
+/// omits it entirely (no empty card) when there's no pantry data yet.
+private struct DailyInsightTile: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s3) {
+            ZStack {
+                Circle().fill(Theme.greenSoft).frame(width: 40, height: 40)
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.greenDeep)
+            }
+            .accessibilityHidden(true)
+
+            Text(text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+
+            Spacer(minLength: 0)
+        }
+        .surfaceCard()
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Filter chip (v3 §5.8)
+
+private struct FilterChipButton: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(isSelected ? Theme.ink : Theme.textSecondary)
+                .padding(.horizontal, Theme.Space.s4)
+                .frame(minHeight: 36)
+                .background(isSelected ? Theme.green : Theme.surface, in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(isSelected ? .clear : Theme.border, lineWidth: 1)
+                )
+        }
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityLabel("\(label) filter")
+    }
+}
+
+// MARK: - Grade dot (v3 §5.3 — mini score disc for cards)
+
+/// Shared band → color mapping (mirrors `ScoreBadge`'s, kept local since this
+/// file owns nothing in that one) — never alarm red for `.low`, per CLAUDE.md's
 /// ED-safe rule.
-private struct ScoreDisc: View {
-    /// `.stacked` — disc above a centered, wrapping label; used in the
-    /// pantry row's narrow trailing column. `.inline` — disc beside a
-    /// leading label; used in the wider trending card. (Named `Arrangement`,
-    /// not `Layout`, to avoid any ambiguity with SwiftUI's own `Layout`
-    /// protocol.)
-    enum Arrangement { case stacked, inline }
+private func bandColor(_ band: ScoreBand) -> Color {
+    switch band {
+    case .high: return Theme.scoreHigh
+    case .mid: return Theme.scoreMid
+    case .low: return Theme.scoreLow
+    case .unknown: return Theme.scoreUnknown
+    }
+}
 
+/// The Ingrex-style "grade dot": a small band-tinted disc with the number
+/// inside, always paired with the band word beside it by callers so color is
+/// never the only signal (v3 §7). Purely decorative on its own — the parent
+/// card supplies one combined accessibility label instead.
+private struct GradeDot: View {
     let score: Int?
     let band: ScoreBand
-    var arrangement: Arrangement = .stacked
+    var diameter: CGFloat = 28
 
-    private var color: Color {
-        switch band {
-        case .high: return Theme.scoreHigh
-        case .mid: return Theme.scoreMid
-        case .low: return Theme.scoreLow
-        case .unknown: return Theme.scoreUnknown
-        }
-    }
-
-    private var accessibilityText: String {
-        score.map { "Score \($0) of 100, \(band.label)" } ?? band.label
-    }
-
-    private var disc: some View {
+    var body: some View {
         ZStack {
-            Circle().fill(color).frame(width: 44, height: 44)
+            Circle().fill(bandColor(band)).frame(width: diameter, height: diameter)
             Text(score.map(String.init) ?? "—")
-                .font(.system(.callout, design: .rounded).weight(.bold))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
         }
-        .frame(width: 44, height: 44)
+        .frame(width: diameter, height: diameter)
+        .accessibilityHidden(true)
     }
+}
 
-    private var label: some View {
-        Text(band.label)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(Theme.textSecondary)
+// MARK: - Product card (v3 §5.4 — the 2-col grid + trending row's shared card)
+
+/// The one product-card language for Home: white surface, radius 20, product
+/// image filling the top on `surfaceAlt`, name + brand, a grade dot + band
+/// word, and a favorite heart. Used both in the Recent/Favorites 2-column
+/// grid (`fixedWidth == nil`, fills its `LazyVGrid` column) and, at a fixed
+/// width, in the horizontally-scrolling Trending row — one visual language
+/// everywhere on Home, per the brief.
+///
+/// The favorite heart is added via `.overlay`, never nested inside the
+/// `NavigationLink`'s label: SwiftUI does not reliably route taps to a
+/// `Button` embedded inside another button/link's label, so nesting them
+/// would make the heart untappable (or double-fire navigation). As a sibling
+/// overlay it gets its own independent 44×44pt tap target and stays a
+/// separate VoiceOver element from the card underneath.
+private struct ProductCard: View {
+    let product: Product
+    /// `nil` lets the card fill its `LazyVGrid` column; a fixed value is used
+    /// for the horizontally-scrolling Trending row.
+    var fixedWidth: CGFloat? = nil
+
+    private var band: ScoreBand { product.score?.band ?? .unknown }
+    private var scoreValue: Int? { product.score?.score }
+
+    private var accessibilityText: String {
+        var parts = [product.name]
+        if let brand = product.brand, !brand.isEmpty { parts.append(brand) }
+        parts.append(scoreValue.map { "Score \($0) of 100, \(band.label)" } ?? band.label)
+        return parts.joined(separator: ". ")
     }
 
     var body: some View {
-        Group {
-            switch arrangement {
-            case .stacked:
-                VStack(spacing: 2) {
-                    disc
-                    label
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
-                .frame(width: 76)
-            case .inline:
-                HStack(spacing: Theme.Space.s2) {
-                    disc
-                    label
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
+        NavigationLink {
+            ProductView(product: product)
+        } label: {
+            cardLabelContent
         }
+        .buttonStyle(CardPressButtonStyle())
+        .frame(width: fixedWidth, alignment: .leading)
+        .accessibilityHint("Opens product details.")
+        .overlay(alignment: .topTrailing) {
+            FavoriteHeartInline(productID: product.id)
+                .padding(6)
+        }
+    }
+
+    /// Image filling the card's top edge-to-edge on `surfaceAlt`, so the
+    /// whole card's outer `radius.md` clip naturally rounds its top corners
+    /// too — no separate corner-only shape needed.
+    private var imageHeader: some View {
+        ZStack {
+            Theme.surfaceAlt
+            ProductThumbnail(urlString: product.imageURL, size: 92)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 132)
+    }
+
+    private var textBlock: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s1) {
+            Text(product.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            if let brand = product.brand, !brand.isEmpty {
+                Text(brand)
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            HStack(spacing: Theme.Space.s2) {
+                GradeDot(score: scoreValue, band: band)
+                Text(band.label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+            .padding(.top, 2)
+        }
+        .padding(Theme.Space.s4)
+        // Reserves a consistent floor height for the text block regardless of
+        // whether the name wraps to one or two lines and whether a brand is
+        // present, so every card in a grid row/trending scroll starts its
+        // score row at roughly the same height. A floor, not a cap — it never
+        // clips content that needs more room at large Dynamic Type sizes.
+        .frame(minHeight: 118, alignment: .top)
+    }
+
+    private var cardLabelContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            imageHeader
+            textBlock
+        }
+        .surfaceCard(padded: false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
 }
 
-/// Shared "surface card" look for the redesigned pantry row and trending
-/// card (docs/DESIGN_SYSTEM.md §5.4: `bg.surface`, subtle border, `radius.md`,
-/// `elevation.1`). Callers apply their own `space.4` padding first — the
-/// pantry row's padding wraps the favorite heart too, while the trending
-/// card's doesn't.
-private extension View {
-    func homeCardSurface() -> some View {
-        background(Theme.surface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .strokeBorder(Theme.border, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-            // §4 elevation.1 (y2, blur8, ~6% navy) — no dedicated "navy" token
-            // exists, so this reuses `Theme.ink` at low opacity. Kept faint by
-            // design (§1: calm, not flashy).
-            .shadow(color: Theme.ink.opacity(0.06), radius: 4, x: 0, y: 2)
-    }
-}
-
-// MARK: - Pantry row
-
-/// One pantry row, redesigned as a **single** surface card containing
-/// everything — thumbnail, name/brand, score, and the favorite heart
-/// (docs/DESIGN_SYSTEM.md §5.4 "Pantry card": "thumbnail, name, score badge,
-/// favorite toggle"). The heart is still a **sibling** of the `NavigationLink`,
-/// not nested inside its label — SwiftUI does not reliably route taps to a
-/// `Button` embedded inside another button/link's label, so nesting them
-/// would make the heart untappable (or double-fire navigation). Keeping them
-/// as HStack siblings (both wrapped in one shared card background) gives each
-/// its own independent 44×44pt tap target while looking like one row, not a
-/// floating heart bolted onto the outside of a card.
-private struct PantryRowContent: View {
-    let entry: PantryEntry
-
-    var body: some View {
-        HStack(spacing: Theme.Space.s3) {
-            NavigationLink {
-                ProductView(product: entry.asProduct())
-            } label: {
-                PantryRow(entry: entry)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens product details.")
-
-            FavoriteHeartInline(productID: entry.product.id)
-        }
-        .padding(Theme.Space.s4)
-        .homeCardSurface()
-    }
-}
-
-private struct PantryRow: View {
-    let entry: PantryEntry
-
-    var body: some View {
-        HStack(alignment: .center, spacing: Theme.Space.s3) {
-            ProductThumbnail(urlString: entry.product.images?.bestURL, size: 56)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.product.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                if let brand = entry.product.brand, !brand.isEmpty {
-                    Text(brand)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-            // Flexible, not a fixed 96pt frame — takes whatever width is left
-            // after the thumbnail/score/heart, so names truncate correctly
-            // instead of wrapping a narrow fixed column.
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            ScoreDisc(score: entry.score?.score, band: entry.band)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Trending card
-
-/// A compact, horizontally-scrolling card for a globally top-scoring cached
-/// product (docs/DESIGN_SYSTEM.md §5.4 card anatomy). Honest framing per
-/// CLAUDE.md: this is a top-scoring cached product, not a paid placement —
-/// the neutral "Trending healthy" heading carries that, no extra badge needed.
-///
-/// Structured as a `NavigationLink` (passive `TrendingCardBody` label, no
-/// interactive controls inside it) with the favorite heart added via
-/// `.overlay`, which composes as a sibling layer rather than nesting a
-/// `Button` inside the link's label (see `PantryRowContent` for why that
-/// matters for tap routing).
-private struct TrendingCardContent: View {
-    let entry: TrendingEntry
-
-    var body: some View {
-        NavigationLink {
-            ProductView(product: entry.asProduct())
-        } label: {
-            TrendingCardBody(entry: entry)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens product details.")
-        .overlay(alignment: .topTrailing) {
-            FavoriteHeartInline(productID: entry.product.id)
-                .padding(.trailing, Theme.Space.s1)
-                .padding(.top, Theme.Space.s1)
-        }
-    }
-}
-
-private struct TrendingCardBody: View {
-    let entry: TrendingEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            // Leading-aligned within a 240pt-wide card, so the top-trailing
-            // heart overlay (44×44pt) never overlaps it.
-            ProductThumbnail(urlString: entry.product.images?.bestURL, size: 56)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.product.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                if let brand = entry.product.brand, !brand.isEmpty {
-                    Text(brand)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-            // Reserves the same vertical space whether a card's name is one
-            // line or two, and whether a brand is present — so the score row
-            // below starts at the same height across every card in the row
-            // (the "align tops" requirement), without clamping the card to a
-            // hard total height that could clip at large Dynamic Type sizes.
-            .frame(minHeight: 54, alignment: .top)
-
-            ScoreDisc(score: entry.score.score, band: entry.band, arrangement: .inline)
-        }
-        .padding(Theme.Space.s4)
-        .frame(width: 240, alignment: .leading)
-        .homeCardSurface()
-        .accessibilityElement(children: .combine)
-    }
-}
-
 // MARK: - Favorite toggle
 
-/// A 44×44pt heart button bound directly to `PantryService`'s favorites
-/// contract (`isFavorite(_:)` / `toggleFavorite(productID:)`). Reads
-/// `pantryService` from the environment itself so both `PantryRowContent`
-/// and `TrendingCardContent` can drop it in without threading state through.
+/// A heart button bound directly to `PantryService`'s favorites contract
+/// (`isFavorite(_:)` / `toggleFavorite(productID:)`). Reads `pantryService`
+/// from the environment itself so `ProductCard` can drop it in without
+/// threading state through. A small white/hairline disc behind the glyph
+/// keeps it legible over any product photo, while the tappable area stays a
+/// full 44×44pt regardless of the smaller visible disc.
 private struct FavoriteHeartInline: View {
     @Environment(PantryService.self) private var pantryService
     let productID: String
@@ -438,20 +485,23 @@ private struct FavoriteHeartInline: View {
             Task { await pantryService.toggleFavorite(productID: productID) }
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(isFavorite ? Theme.greenDeep : Theme.textSecondary)
-                .frame(width: 44, height: 44)
+                .frame(width: 32, height: 32)
+                .background(Theme.surface.opacity(0.92), in: Circle())
+                .overlay(Circle().strokeBorder(Theme.border, lineWidth: 1))
         }
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
         .accessibilityAddTraits(isFavorite ? [.isSelected] : [])
     }
 }
 
-// MARK: - States (§5.9 — empty, loading, error)
+// MARK: - States (empty, loading, error)
 
-/// A calm single-message card used for empty and error states alike — the
-/// error variant adds a "Try again" affordance (§5.9: "what happened + how
-/// to fix").
+/// A calm single-message white floating card used for empty and error states
+/// alike — the error variant adds a "Try again" affordance.
 private struct StateCard: View {
     let message: String
     var actionTitle: String? = nil
@@ -471,73 +521,61 @@ private struct StateCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(Theme.Space.s4)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .surfaceCard()
     }
 }
 
-/// Skeleton loader for the pantry list (§5.9: "skeletons for lists"). Static
+/// Skeleton loader matching `ProductCard`'s geometry (image block + reserved
+/// text-block height), so loading never jumps once real cards arrive. Static
 /// blocks, not a shimmer animation — calm by default and automatically
 /// Reduce-Motion-safe since nothing here animates.
-private struct PantrySkeletonList: View {
+private struct SkeletonProductCard: View {
     var body: some View {
-        VStack(spacing: Theme.Space.s3) {
-            ForEach(0..<3, id: \.self) { _ in SkeletonPantryRow() }
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle()
+                .fill(Theme.border.opacity(0.5))
+                .frame(height: 132)
+            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 14)
+                RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 80, height: 10)
+                Circle().fill(Theme.border.opacity(0.5)).frame(width: 28, height: 28)
+            }
+            .padding(Theme.Space.s4)
+            .frame(minHeight: 118, alignment: .top)
+        }
+        .surfaceCard(padded: false)
+    }
+}
+
+/// Skeleton for the Recent/Favorites grid — mirrors `HomeView.gridColumns`
+/// (single column at accessibility Dynamic Type sizes) so the loading state's
+/// layout matches whatever the real grid will do once entries arrive.
+private struct ProductGridSkeleton: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var columns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.flexible(), spacing: Theme.Space.s4), GridItem(.flexible())]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: Theme.Space.s4) {
+            ForEach(0..<4, id: \.self) { _ in SkeletonProductCard() }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading your pantry")
     }
 }
 
-/// Matches `PantryRowContent`'s compact geometry exactly (56pt thumbnail,
-/// `space.4` card padding, 44pt score placeholder, 44pt heart placeholder) so
-/// loading never jumps once real rows arrive.
-private struct SkeletonPantryRow: View {
-    var body: some View {
-        HStack(spacing: Theme.Space.s3) {
-            RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                .fill(Theme.border.opacity(0.6))
-                .frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 12)
-                RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 60, height: 10)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Circle().fill(Theme.border.opacity(0.6)).frame(width: 44, height: 44)
-            Circle().fill(Theme.border.opacity(0.35)).frame(width: 44, height: 44)
-        }
-        .padding(Theme.Space.s4)
-        .homeCardSurface()
-    }
-}
-
-/// Skeleton loader for the horizontal trending row — mirrors
-/// `TrendingCardBody`'s geometry (240pt width, `space.4` padding, reserved
-/// name-block height, inline score placeholder).
+/// Skeleton for the horizontally-scrolling Trending row — same fixed card
+/// width as the real `ProductCard(fixedWidth:)` usage.
 private struct TrendingSkeletonRow: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: Theme.Space.s3) {
+            HStack(alignment: .top, spacing: Theme.Space.s4) {
                 ForEach(0..<3, id: \.self) { _ in
-                    VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                            .fill(Theme.border.opacity(0.6))
-                            .frame(width: 56, height: 56)
-                        VStack(alignment: .leading, spacing: 4) {
-                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(height: 12)
-                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.6)).frame(width: 120, height: 12)
-                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 80, height: 10)
-                        }
-                        .frame(minHeight: 54, alignment: .top)
-                        HStack(spacing: Theme.Space.s2) {
-                            Circle().fill(Theme.border.opacity(0.6)).frame(width: 44, height: 44)
-                            RoundedRectangle(cornerRadius: 4).fill(Theme.border.opacity(0.4)).frame(width: 90, height: 10)
-                        }
-                    }
-                    .padding(Theme.Space.s4)
-                    .frame(width: 240, alignment: .leading)
-                    .homeCardSurface()
+                    SkeletonProductCard().frame(width: 172)
                 }
             }
             .padding(.vertical, Theme.Space.s1)
@@ -559,47 +597,74 @@ private struct TrendingSkeletonRow: View {
         .environment(pantry)
 }
 
-#Preview("Pantry — recent list") {
+#Preview("Product grid — incl. long name") {
     NavigationStack {
         ScrollView {
-            VStack(spacing: Theme.Space.s3) {
-                PantryRowContent(entry: .previewShort)
-                PantryRowContent(entry: .previewLongName)
-                PantryRowContent(entry: .previewFavorited)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible())], spacing: 16) {
+                ProductCardPreviewHost(product: PantryEntry.previewShort.asProduct())
+                ProductCardPreviewHost(product: PantryEntry.previewFavorited.asProduct())
+                ProductCardPreviewHost(product: PantryEntry.previewLongName.asProduct())
             }
-            .padding()
+            .padding(20)
         }
+        .background(Theme.canvas)
     }
     .environment(PantryService(session: SessionService()))
 }
 
-#Preview("Pantry row — favorited") {
-    NavigationStack {
-        PantryRowContent(entry: .previewFavorited)
-            .padding()
+#Preview("Filter chips") {
+    HStack(spacing: 8) {
+        FilterChipButton(label: "Recent", isSelected: true, action: {})
+        FilterChipButton(label: "Favorites", isSelected: false, action: {})
     }
-    .environment(PantryService(session: SessionService()))
+    .padding()
+    .background(Theme.canvas)
 }
 
-#Preview("Trending cards") {
+#Preview("Trending row") {
     NavigationStack {
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: Theme.Space.s3) {
-                TrendingCardContent(entry: .preview)
-                TrendingCardContent(entry: .previewLongName)
+            HStack(alignment: .top, spacing: 16) {
+                ProductCardPreviewHost(product: TrendingEntry.preview.asProduct(), fixedWidth: 172)
+                ProductCardPreviewHost(product: TrendingEntry.previewLongName.asProduct(), fixedWidth: 172)
             }
-            .padding()
+            .padding(20)
         }
+        .background(Theme.canvas)
     }
     .environment(PantryService(session: SessionService()))
 }
 
 #Preview("Skeletons") {
-    VStack(alignment: .leading, spacing: Theme.Space.s5) {
-        PantrySkeletonList()
-        TrendingSkeletonRow()
+    ScrollView {
+        VStack(alignment: .leading, spacing: 32) {
+            ProductGridSkeleton()
+            TrendingSkeletonRow()
+        }
+        .padding(20)
     }
-    .padding()
+    .background(Theme.canvas)
+}
+
+#Preview("Empty state") {
+    VStack(spacing: 24) {
+        StateCard(message: "Your pantry's empty — scan your first product.")
+        StateCard(message: "Something went wrong. Try again.", actionTitle: "Try again", action: {})
+    }
+    .padding(20)
+    .background(Theme.canvas)
+}
+
+/// Thin pass-through to `ProductCard` so each preview above can be built with
+/// plain, readable call sites; the surrounding preview supplies the single
+/// `NavigationStack` each `NavigationLink`-based card needs.
+private struct ProductCardPreviewHost: View {
+    let product: Product
+    var fixedWidth: CGFloat? = nil
+
+    var body: some View {
+        ProductCard(product: product, fixedWidth: fixedWidth)
+    }
 }
 
 fileprivate extension PantryEntry {
@@ -632,7 +697,7 @@ fileprivate extension PantryEntry {
         )
     )
 
-    /// Exercises the flexible name column + wrapping score label at their
+    /// Exercises the flexible name column + wrapping band label at their
     /// worst case: a long name, a long brand, and a low-band score.
     static let previewLongName = PantryEntry(
         item: PantryItemRow(
@@ -715,8 +780,8 @@ fileprivate extension TrendingEntry {
         )
     )
 
-    /// Exercises the trending card's reserved name-block height + inline
-    /// score label wrapping with a long name/brand pair.
+    /// Exercises the trending card's reserved text-block height + name
+    /// wrapping with a long name/brand pair.
     static let previewLongName = TrendingEntry(
         product: ProductRow(
             id: "product-4",
