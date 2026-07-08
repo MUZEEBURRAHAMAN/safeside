@@ -1,4 +1,5 @@
 import AVFoundation
+import PhotosUI
 import SwiftUI
 import UIKit
 import Vision
@@ -156,7 +157,16 @@ final class ScanViewModel {
         // is what locks the reticle solid in ScanOverlay.
         feedback.notificationOccurred(.success)
         phase = .lookingUp
+        await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService)
+    }
 
+    /// Core barcode → product network lookup, shared by `handle(barcode:)`
+    /// (live scanning) and `analyzeGalleryPhoto` (a barcode found in a picked
+    /// photo) so both go through the exact same backend call and
+    /// error/needsOCR handling. Callers own the `isLookingUp` guard and the
+    /// `.lookingUp` phase/haptic — this only does the request + result.
+    @MainActor
+    private func lookUpProduct(barcode: String, api: APIClient, pantryService: PantryService) async {
         do {
             let product = try await api.product(barcode: barcode)
             self.product = product
@@ -194,6 +204,22 @@ final class ScanViewModel {
                 phase = .labelNotFound
                 return
             }
+            await analyzeLabelText(text, api: api, pantryService: pantryService)
+        } catch {
+            // Capture/Vision-side failure (camera busy, no frame, no text
+            // recognized) — calm "couldn't read that" recovery, since the
+            // likely fix is lighting/positioning, not "something went wrong."
+            phase = .labelNotFound
+        }
+    }
+
+    /// Core OCR text → product network lookup, shared by `captureLabel(handle:)`
+    /// (live "Snap the label") and `analyzeGalleryPhoto` (no barcode found in
+    /// a picked photo, falls back to recognized text) — same backend call and
+    /// error handling either way.
+    @MainActor
+    private func analyzeLabelText(_ text: String, api: APIClient, pantryService: PantryService) async {
+        do {
             let product = try await api.analyzeLabel(text: text)
             self.product = product
             phase = .scanning
@@ -208,11 +234,57 @@ final class ScanViewModel {
             // error banner a barcode lookup would show.
             phase = .error(error.errorDescription ?? "Something went wrong. Try again.")
         } catch {
-            // Capture/Vision-side failure (camera busy, no frame, no text
-            // recognized) — calm "couldn't read that" recovery, since the
-            // likely fix is lighting/positioning, not "something went wrong."
-            phase = .labelNotFound
+            phase = .error("Something went wrong. Try again.")
         }
+    }
+
+    /// Gallery fallback (founder request — control cluster's "Choose a photo"):
+    /// loads the picked image, tries Vision's barcode detector first (same
+    /// symbologies as the live scanner in `ScannerView` above) and routes a
+    /// hit through the exact same lookup as a live scan; if no barcode is
+    /// found, falls back to `VNRecognizeTextRequest` and routes the result
+    /// through the same OCR path as `captureLabel`. Never throws outward —
+    /// every failure (bad data, no barcode, no text) degrades to the calm
+    /// `.labelNotFound` banner ("Couldn't read that.").
+    ///
+    /// Reuses `isLookingUp` for the *entire* flow (load + Vision + network),
+    /// not just the network part, so a live scan can't race a gallery pick —
+    /// this deliberately calls the private `lookUpProduct`/`analyzeLabelText`
+    /// helpers directly rather than the public `handle(barcode:)` /
+    /// `captureLabel(handle:)`, which would immediately bail on their own
+    /// `isLookingUp` guard.
+    @MainActor
+    func analyzeGalleryPhoto(_ item: PhotosPickerItem, api: APIClient, pantryService: PantryService) async {
+        guard !isLookingUp, !showProduct else { return }
+        isLookingUp = true
+        defer { isLookingUp = false }
+        // We don't yet know if this is a barcode photo or a label photo, so
+        // "Reading the label…" is the closer-fitting of the two existing
+        // loading captions for this in-between "loading + running Vision" moment.
+        phase = .capturingLabel
+
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImage = UIImage(data: data) else {
+            phase = .labelNotFound
+            return
+        }
+
+        let detectedBarcode = (try? await GalleryBarcodeDetector.detectPayload(in: uiImage)) ?? nil
+        if let barcode = detectedBarcode {
+            feedback.notificationOccurred(.success)
+            phase = .lookingUp
+            await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService)
+            return
+        }
+
+        let recognizedText = (try? await VisionOCR.recognizeText(in: uiImage)) ?? nil
+        guard let text = recognizedText else {
+            // Neither a barcode nor readable text in the photo — calm retry,
+            // reusing the existing labelNotFound copy/state.
+            phase = .labelNotFound
+            return
+        }
+        await analyzeLabelText(text, api: api, pantryService: pantryService)
     }
 
     /// Re-arms scanning — called on Retry/"Try another scan", and when the
@@ -222,6 +294,59 @@ final class ScanViewModel {
         product = nil
         blockedBarcode = nil
         feedback.prepare()
+    }
+}
+
+/// Vision's barcode detector run once against a still image from the photo
+/// library (gallery fallback), using the same symbology list as the live
+/// `DataScannerViewController` above so a picked photo can be routed through
+/// the exact same barcode lookup path as a live scan. Deliberately separate
+/// from VisionOCR.swift's text-recognition helper (different Vision request
+/// type; kept here since this feature's file ownership is ScanOverlay.swift +
+/// ScannerView.swift only).
+private enum GalleryBarcodeDetector {
+    static func detectPayload(in image: UIImage) async throws -> String? {
+        guard let cgImage = image.cgImage else { return nil }
+        let orientation = CGImagePropertyOrientation(galleryImageOrientation: image.imageOrientation)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let request = VNDetectBarcodesRequest()
+                request.symbologies = [
+                    .ean13, .ean8, .upce, .code128, .code39, .code93, .itf14, .qr
+                ]
+                let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+                do {
+                    try handler.perform([request])
+                    // A picked photo should contain one product barcode
+                    // (unlike the multi-item live-scan case) — first hit wins.
+                    let payload = (request.results ?? []).compactMap { $0.payloadStringValue }.first
+                    continuation.resume(returning: payload)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+}
+
+/// Local copy of the standard `UIImage.Orientation` → `CGImagePropertyOrientation`
+/// mapping (VisionOCR.swift has its own file-private version of this same
+/// mapping) — duplicated here rather than shared since this feature's file
+/// ownership is ScanOverlay.swift + ScannerView.swift only.
+private extension CGImagePropertyOrientation {
+    init(galleryImageOrientation orientation: UIImage.Orientation) {
+        switch orientation {
+        case .up: self = .up
+        case .upMirrored: self = .upMirrored
+        case .down: self = .down
+        case .downMirrored: self = .downMirrored
+        case .left: self = .left
+        case .leftMirrored: self = .leftMirrored
+        case .right: self = .right
+        case .rightMirrored: self = .rightMirrored
+        @unknown default: self = .up
+        }
     }
 }
 
@@ -315,8 +440,12 @@ struct ScanScreen: View {
             }
             .ignoresSafeArea()
 
-            ScanOverlay(phase: vm.phase)
-                .ignoresSafeArea()
+            ScanOverlay(phase: vm.phase) { item in
+                Task {
+                    await vm.analyzeGalleryPhoto(item, api: APIClient(session: session), pantryService: pantryService)
+                }
+            }
+            .ignoresSafeArea()
         }
         .overlay(alignment: .bottom) { phaseBanner }
     }

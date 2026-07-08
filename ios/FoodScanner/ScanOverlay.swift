@@ -1,31 +1,42 @@
 import AVFoundation
+import PhotosUI
 import SwiftUI
 
 /// Aim guidance drawn above the live `DataScannerViewController` feed
 /// (docs/DESIGN_SYSTEM_V3.md §5.9 — "the dark brand moment"): a centered,
 /// brand-green corner-bracket reticle that locks solid the instant a barcode
 /// is caught, a dimmed surround so users know where to point the camera, a
-/// top instruction pill, and a torch toggle for low light. Lime is used only
-/// as the small "spark" accent on this dark surface (the sweep line) — the
-/// reticle itself and the lock state both stay brand green, per spec.
+/// top instruction pill, and a trailing-edge control cluster (zoom / gallery /
+/// torch — see `controlCluster` below) for low light and photo-library scans.
+/// Lime is used only as the small "spark" accent on this dark surface (the
+/// sweep line) — the reticle itself and the lock state both stay brand green,
+/// per spec.
 ///
 /// Purely visual/feedback — the scanner underneath keeps running through
 /// every phase, so a re-aim after an error or "not found" always works.
 struct ScanOverlay: View {
     let phase: ScanViewModel.Phase
+    /// Fired the instant the user picks a photo from `PhotosPicker` — the
+    /// caller (`ScanScreen`) owns everything past that point (loading the
+    /// image, running Vision, hitting the backend) via `ScanViewModel`.
+    let onPhotoPicked: (PhotosPickerItem) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sweepOffset: CGFloat = 0
     @State private var torchOn = false
+    @State private var isZoomedIn = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     private let reticleSize: CGFloat = 240
     private let hasTorch = AVCaptureDevice.default(for: .video)?.hasTorch ?? false
 
     private var isLocked: Bool { phase == .lookingUp }
     // The lookingUp/error/needsOCR states already surface their own text via
-    // ScanScreen's bottom banner — only show this line for plain idle
-    // scanning so we never stack two messages.
+    // ScanScreen's bottom banner — only show the instruction pill and the
+    // control cluster for plain idle scanning, so we never stack the cluster
+    // (or a second message) on top of a banner.
     private var showsInstruction: Bool { phase == .scanning }
+    private var showsControlCluster: Bool { phase == .scanning }
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,29 +63,38 @@ struct ScanOverlay: View {
                         .padding(.horizontal, Theme.Space.s4)
                     Spacer(minLength: 0)
                 }
+
+                if showsControlCluster {
+                    controlCluster
+                        // Same safe-area-aware trick as topBar above, but for
+                        // the trailing edge — pins ~16pt clear of the edge on
+                        // every device instead of guessing a fixed inset.
+                        .padding(.trailing, proxy.safeAreaInsets.trailing + Theme.Space.s4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                }
             }
         }
         .onAppear { startSweepIfNeeded() }
-        .onDisappear { if torchOn { toggleTorch() } }   // never leave the flashlight on after leaving Scan
+        .onDisappear {
+            if torchOn { toggleTorch() }   // never leave the flashlight on after leaving Scan
+            if isZoomedIn { toggleZoom() } // ...or the camera zoomed in
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            selectedPhotoItem = nil // re-arm so picking the same photo again still fires a change
+            onPhotoPicked(newItem)
+        }
     }
 
-    // MARK: - Top bar (instruction pill + torch)
+    // MARK: - Top bar (instruction pill)
 
-    /// Balances the instruction pill so it reads visually centered whether or
-    /// not the torch button is present, matching the reference's
-    /// pill-top-center / control-top-corner layout (reference/moodboards
-    /// "Ingrex" dark scan screen).
     private var topBar: some View {
         HStack(spacing: Theme.Space.s3) {
-            Color.clear.frame(width: hasTorch ? 44 : 0)
             Spacer(minLength: 0)
             if showsInstruction {
                 instructionLabel
             }
             Spacer(minLength: 0)
-            if hasTorch {
-                torchButton
-            }
         }
     }
 
@@ -148,15 +168,67 @@ struct ScanOverlay: View {
             .background(Theme.forest.opacity(0.85), in: Capsule())
     }
 
-    // MARK: - Torch
+    // MARK: - Control cluster (founder request: vertical pill, trailing edge,
+    // vertically centered — zoom / gallery / torch, top to bottom)
+
+    /// A dark, vertically-stacked pill of three 44×44pt controls, matching
+    /// the iOS Camera app's trailing-edge control convention. Torch only
+    /// appears when the device actually has one (`hasTorch`); zoom and
+    /// gallery are always available.
+    private var controlCluster: some View {
+        VStack(spacing: 0) {
+            zoomButton
+            clusterDivider
+            galleryButton
+            if hasTorch {
+                clusterDivider
+                torchButton
+            }
+        }
+        .padding(.vertical, Theme.Space.s2)
+        .frame(width: 44)
+        .background(Theme.ink.opacity(0.6), in: Capsule())
+    }
+
+    private var clusterDivider: some View {
+        Rectangle()
+            .fill(Theme.onGreen.opacity(0.2))
+            .frame(width: 24, height: 1)
+    }
+
+    /// "1×" / "2×" toggle — see `toggleZoom()` for the device-level
+    /// `videoZoomFactor` trick (same pattern as `toggleTorch()` below).
+    private var zoomButton: some View {
+        Button(action: toggleZoom) {
+            Text(isZoomedIn ? "2×" : "1×")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.onGreen)
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Zoom, currently \(isZoomedIn ? "2x" : "1x")")
+        .accessibilityHint("Double tap to switch to \(isZoomedIn ? "1x" : "2x") zoom.")
+    }
+
+    /// Presents the system photo picker; the actual scan (barcode-first,
+    /// OCR-fallback) happens in `ScanViewModel.analyzeGalleryPhoto`, wired up
+    /// by `ScanScreen` via `onPhotoPicked`.
+    private var galleryButton: some View {
+        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+            Image(systemName: "photo.on.rectangle")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.onGreen)
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Choose a photo")
+        .accessibilityHint("Scans a barcode or ingredients label from a photo in your library.")
+    }
 
     private var torchButton: some View {
         Button(action: toggleTorch) {
             Image(systemName: torchOn ? "bolt.fill" : "bolt.slash.fill")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(torchOn ? Theme.ink : Theme.onGreen)
-                .frame(minWidth: 44, minHeight: 44)
-                .background(torchOn ? Theme.lime : Theme.ink.opacity(0.55), in: Circle())
+                .foregroundStyle(torchOn ? Theme.lime : Theme.onGreen)
+                .frame(width: 44, height: 44)
         }
         .accessibilityLabel(torchOn ? "Turn off flashlight" : "Turn on flashlight")
         .accessibilityHint("Toggles the camera flashlight for low light.")
@@ -171,6 +243,38 @@ struct ScanOverlay: View {
             device.unlockForConfiguration()
         } catch {
             // Device busy/unavailable — leave state as-is; button stays tappable to retry.
+        }
+    }
+
+    /// Same device-level trick as `toggleTorch()` — `DataScannerViewController`
+    /// owns the capture session, but `videoZoomFactor` is a property of the
+    /// underlying `AVCaptureDevice`, which we can still reach directly.
+    /// Clamps to `maxAvailableVideoZoomFactor` and degrades gracefully (label
+    /// stays "1×") if the device can't zoom or the config lock fails.
+    private func toggleZoom() {
+        guard let device = AVCaptureDevice.default(for: .video) else { return }
+
+        if isZoomedIn {
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = 1.0
+                device.unlockForConfiguration()
+                isZoomedIn = false
+            } catch {
+                // Leave state as-is; button stays tappable to retry.
+            }
+            return
+        }
+
+        let target = min(2.0, device.maxAvailableVideoZoomFactor)
+        guard target > 1.0 else { return } // device can't zoom past 1x — stay at 1x
+        do {
+            try device.lockForConfiguration()
+            device.videoZoomFactor = target
+            device.unlockForConfiguration()
+            isZoomedIn = true
+        } catch {
+            // Leave state as-is; label stays "1×".
         }
     }
 }
