@@ -21,6 +21,25 @@ struct FoodScannerApp: App {
 
     var body: some Scene {
         WindowGroup {
+#if DEBUG
+            // Screenshot harness: `SHOW_SAMPLE_RESULT=1` boots straight into a
+            // populated ProductView so detail screens can be verified on the
+            // simulator without a live scan/tap. DEBUG-only.
+            if ProcessInfo.processInfo.environment["SHOW_SAMPLE_RESULT"] == "1" {
+                NavigationStack { ProductView(product: .sampleScored) }
+                    .environment(session)
+                    .environment(pantryService)
+                    .tint(Theme.greenDeep)
+            } else {
+                appBody
+            }
+#else
+            appBody
+#endif
+        }
+    }
+
+    private var appBody: some View {
             RootTabView()
                 .environment(session)
                 .environment(pantryService)
@@ -33,7 +52,6 @@ struct FoodScannerApp: App {
                     }
                     .environment(profileService)
                 }
-        }
     }
 }
 
