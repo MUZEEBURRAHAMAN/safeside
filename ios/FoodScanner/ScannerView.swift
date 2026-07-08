@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import UIKit
+import Vision
 import VisionKit
 
 /// Barcode scanning via VisionKit DataScannerViewController (first-party, iOS 16+).
@@ -10,11 +11,26 @@ struct ScannerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
-            recognizedDataTypes: [.barcode()],
-            qualityLevel: .balanced,
-            recognizesMultipleItems: false,
+            // Explicit symbology list, not the framework default set — retail
+            // packaging uses EAN-13/EAN-8/UPC-E almost exclusively, with
+            // Code128/39/93 and ITF-14 on shipping/bulk cases, plus QR for
+            // some house brands. Relying on the default set was the likely
+            // cause of "some barcodes scan, some don't".
+            recognizedDataTypes: [
+                .barcode(symbologies: [
+                    .ean13, .ean8, .upce, .code128, .code39, .code93, .itf14, .qr
+                ])
+            ],
+            qualityLevel: .balanced,        // accuracy over speed — small/curved retail codes need this
+            // Multiple items can be in frame at once (shelf, multipack); we
+            // pick the best candidate ourselves in the coordinator rather
+            // than trust "the first thing recognized".
+            recognizesMultipleItems: true,
             isHighFrameRateTrackingEnabled: true,
-            isHighlightingEnabled: true
+            // We draw our own reticle/lock feedback (ScanOverlay) instead of
+            // VisionKit's built-in per-item highlight boxes, so the two
+            // don't visually compete now that multiple items can be tracked.
+            isHighlightingEnabled: false
         )
         scanner.delegate = context.coordinator
         // If the user hasn't been asked for camera permission yet, this is the
@@ -32,19 +48,54 @@ struct ScannerView: UIViewControllerRepresentable {
         let onBarcode: (String) -> Void
         init(onBarcode: @escaping (String) -> Void) { self.onBarcode = onBarcode }
 
-        // Fires once per newly-recognized item. We deliberately don't gate
-        // this with a one-shot "handled" flag: debouncing "one lookup at a
-        // time" is the ScanViewModel's job (so scanning naturally re-arms —
-        // move the barcode out of frame and back in, or point at a new
-        // product, to look up again after an error).
+        // Fires on every add/update batch. We deliberately don't gate this
+        // with a one-shot "handled" flag: debouncing "one lookup at a time",
+        // and not re-spamming a barcode that just failed, are the
+        // ScanViewModel's job (see blockedBarcode there) — that's what lets
+        // re-aiming at a *different* code work immediately after an error.
         func dataScanner(_ scanner: DataScannerViewController, didAdd added: [RecognizedItem],
                          allItems: [RecognizedItem]) {
-            for item in added {
-                if case let .barcode(bc) = item, let payload = bc.payloadStringValue {
-                    onBarcode(payload)
-                    break
+            fireBestBarcode(from: allItems, scanner: scanner)
+        }
+
+        // With recognizesMultipleItems enabled, items already in frame keep
+        // reporting updates (bounds move as the phone/product moves) — this
+        // is what lets us continuously prefer whichever barcode is currently
+        // most centered, not just whichever was recognized first.
+        func dataScanner(_ scanner: DataScannerViewController, didUpdate updated: [RecognizedItem],
+                         allItems: [RecognizedItem]) {
+            fireBestBarcode(from: allItems, scanner: scanner)
+        }
+
+        private func fireBestBarcode(from items: [RecognizedItem], scanner: DataScannerViewController) {
+            let center = CGPoint(x: scanner.view.bounds.midX, y: scanner.view.bounds.midY)
+            guard let payload = bestBarcode(among: items, centeredOn: center) else { return }
+            onBarcode(payload)
+        }
+
+        /// Picks the recognized barcode closest to the given point, ignoring
+        /// non-barcode items (e.g. text) and barcodes VisionKit couldn't
+        /// decode a payload for.
+        private func bestBarcode(among items: [RecognizedItem], centeredOn center: CGPoint) -> String? {
+            var bestPayload: String?
+            var bestDistanceSquared = CGFloat.greatestFiniteMagnitude
+
+            for item in items {
+                guard case let .barcode(barcode) = item, let payload = barcode.payloadStringValue else { continue }
+                let bounds = item.bounds
+                let itemCenter = CGPoint(
+                    x: (bounds.topLeft.x + bounds.topRight.x + bounds.bottomLeft.x + bounds.bottomRight.x) / 4,
+                    y: (bounds.topLeft.y + bounds.topRight.y + bounds.bottomLeft.y + bounds.bottomRight.y) / 4
+                )
+                let dx = itemCenter.x - center.x
+                let dy = itemCenter.y - center.y
+                let distanceSquared = dx * dx + dy * dy
+                if distanceSquared < bestDistanceSquared {
+                    bestDistanceSquared = distanceSquared
+                    bestPayload = payload
                 }
             }
+            return bestPayload
         }
     }
 }
@@ -65,13 +116,32 @@ final class ScanViewModel {
     var showProduct = false
 
     private var isLookingUp = false
+    // The last barcode that resulted in an error/needsOCR, so a stationary
+    // camera doesn't spam-retry it every frame. Cleared on reset() (Retry /
+    // "Try another scan" / returning from a product) so the exact same code
+    // can be tried again on purpose.
+    private var blockedBarcode: String?
+    // Kept warm so the very first success haptic has no perceptible delay —
+    // the whole point is to make detection feel instant.
+    private let feedback = UINotificationFeedbackGenerator()
+
+    init() {
+        feedback.prepare()
+    }
 
     @MainActor
     func handle(barcode: String, api: APIClient) async {
-        guard !isLookingUp else { return }   // debounce: one lookup at a time
+        guard !isLookingUp, !showProduct else { return }   // one lookup at a time; ignore while navigating away
+        guard barcode != blockedBarcode else { return }    // don't spam-retry a code that just failed
         isLookingUp = true
-        phase = .lookingUp
         defer { isLookingUp = false }
+
+        // Fire immediately — before the network call — so the user gets
+        // instant confirmation that the scan was caught, independent of
+        // backend latency. Phase flips to .lookingUp in the same tick, which
+        // is what locks the reticle solid in ScanOverlay.
+        feedback.notificationOccurred(.success)
+        phase = .lookingUp
 
         do {
             let product = try await api.product(barcode: barcode)
@@ -79,10 +149,13 @@ final class ScanViewModel {
             phase = .scanning
             showProduct = true
         } catch APIClient.APIError.needsOCR {
+            blockedBarcode = barcode
             phase = .needsOCR
         } catch let error as APIClient.APIError {
+            blockedBarcode = barcode
             phase = .error(error.errorDescription ?? "Something went wrong. Try again.")
         } catch {
+            blockedBarcode = barcode
             phase = .error("Something went wrong. Try again.")
         }
     }
@@ -92,6 +165,8 @@ final class ScanViewModel {
     func reset() {
         phase = .scanning
         product = nil
+        blockedBarcode = nil
+        feedback.prepare()
     }
 }
 
@@ -168,6 +243,9 @@ struct ScanScreen: View {
                 Task { await vm.handle(barcode: code, api: APIClient(session: session)) }
             }
             .ignoresSafeArea()
+
+            ScanOverlay(phase: vm.phase)
+                .ignoresSafeArea()
         }
         .overlay(alignment: .bottom) { phaseBanner }
     }
