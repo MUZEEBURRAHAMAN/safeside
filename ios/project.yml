@@ -31,10 +31,9 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1,2" # iPhone + iPad
     CODE_SIGN_STYLE: Automatic
-    # TODO(you): set your Apple Developer Team ID before building on a device
-    # or archiving — either here (e.g. "ABCDE12345") or as DEVELOPMENT_TEAM in
-    # Config.xcconfig. Simulator builds work with this left empty.
-    DEVELOPMENT_TEAM: ""
+    # Muzeeb's Personal Team (free Apple ID). Swap for a paid-program team ID
+    # before TestFlight/App Store. Simulator builds work regardless.
+    DEVELOPMENT_TEAM: "JPS4HAKT9Z"
 
 packages:
   Supabase:
