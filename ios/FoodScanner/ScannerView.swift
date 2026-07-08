@@ -130,7 +130,7 @@ final class ScanViewModel {
     }
 
     @MainActor
-    func handle(barcode: String, api: APIClient) async {
+    func handle(barcode: String, api: APIClient, pantryService: PantryService) async {
         guard !isLookingUp, !showProduct else { return }   // one lookup at a time; ignore while navigating away
         guard barcode != blockedBarcode else { return }    // don't spam-retry a code that just failed
         isLookingUp = true
@@ -148,6 +148,9 @@ final class ScanViewModel {
             self.product = product
             phase = .scanning
             showProduct = true
+            // Auto-save to the pantry (MASTER_PLAN Phase 2). Fire-and-forget —
+            // must never block/delay navigation to the result screen.
+            pantryService.save(product: product)
         } catch APIClient.APIError.needsOCR {
             blockedBarcode = barcode
             phase = .needsOCR
@@ -194,6 +197,7 @@ private enum CameraAvailability: Equatable {
 /// loading, error, needs-OCR) around the live scanner.
 struct ScanScreen: View {
     @Environment(SessionService.self) private var session
+    @Environment(PantryService.self) private var pantryService
     @Environment(\.scenePhase) private var scenePhase
     @State private var vm = ScanViewModel()
     // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
@@ -240,7 +244,7 @@ struct ScanScreen: View {
     private var scannerBody: some View {
         ZStack {
             ScannerView { code in
-                Task { await vm.handle(barcode: code, api: APIClient(session: session)) }
+                Task { await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService) }
             }
             .ignoresSafeArea()
 

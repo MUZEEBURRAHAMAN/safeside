@@ -26,6 +26,11 @@ final class SessionService {
     /// nil when SUPABASE_URL / SUPABASE_ANON_KEY are missing (see AppConfig).
     private let client: SupabaseClient?
 
+    /// Direct table access (PostgREST) for services that read/write their own
+    /// tables beyond APIClient's Edge Function calls — PantryService,
+    /// ProfileService. `nil` exactly when `client` is (backend not configured).
+    var supabaseClient: SupabaseClient? { client }
+
     init() {
         guard let url = AppConfig.supabaseURL, let key = AppConfig.supabaseAnonKey else {
             client = nil

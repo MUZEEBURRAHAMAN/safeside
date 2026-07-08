@@ -3,13 +3,36 @@ import SwiftUI
 @main
 struct FoodScannerApp: App {
     // Guest-first: an anonymous session exists from launch (no login wall).
-    @State private var session = SessionService()
+    @State private var session: SessionService
+    @State private var pantryService: PantryService
+    @State private var profileService: ProfileService
+
+    // Onboarding is skippable and shown once — never gates scanning. Seeded
+    // from UserDefaults so a fresh install (and only a fresh install) sees it.
+    @State private var showOnboarding: Bool
+
+    init() {
+        let session = SessionService()
+        _session = State(initialValue: session)
+        _pantryService = State(initialValue: PantryService(session: session))
+        _profileService = State(initialValue: ProfileService(session: session))
+        _showOnboarding = State(initialValue: !UserDefaults.standard.bool(forKey: "hasOnboarded"))
+    }
 
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .environment(session)
+                .environment(pantryService)
+                .environment(profileService)
                 .tint(Theme.greenDeep)
+                .fullScreenCover(isPresented: $showOnboarding) {
+                    OnboardingView {
+                        UserDefaults.standard.set(true, forKey: "hasOnboarded")
+                        showOnboarding = false
+                    }
+                    .environment(profileService)
+                }
         }
     }
 }
