@@ -2,10 +2,12 @@ import AVFoundation
 import SwiftUI
 
 /// Aim guidance drawn above the live `DataScannerViewController` feed
-/// (docs/DESIGN_SYSTEM.md §5.9 states, §7 motion, §10.4 scan-bracket motif):
-/// a centered reticle that locks solid brand-green the instant a barcode is
-/// caught, a dimmed surround so users know where to point the camera, a
-/// short instruction line, and a torch toggle for low light.
+/// (docs/DESIGN_SYSTEM_V3.md §5.9 — "the dark brand moment"): a centered,
+/// brand-green corner-bracket reticle that locks solid the instant a barcode
+/// is caught, a dimmed surround so users know where to point the camera, a
+/// top instruction pill, and a torch toggle for low light. Lime is used only
+/// as the small "spark" accent on this dark surface (the sweep line) — the
+/// reticle itself and the lock state both stay brand green, per spec.
 ///
 /// Purely visual/feedback — the scanner underneath keeps running through
 /// every phase, so a re-aim after an error or "not found" always works.
@@ -38,20 +40,17 @@ struct ScanOverlay: View {
                     .position(center)
                     .accessibilityHidden(true)
 
-                if showsInstruction {
-                    instructionLabel
-                        .position(x: center.x, y: center.y + reticleSize / 2 + Theme.Space.s6)
-                }
-
-                if hasTorch {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            torchButton
-                        }
-                        Spacer()
-                    }
-                    .padding(Theme.Space.s4)
+                VStack(spacing: 0) {
+                    topBar
+                        // GeometryProxy.safeAreaInsets still reports the
+                        // nav-bar/status-bar inset here even though this view
+                        // (and its ScannerView sibling) ignore safe area to
+                        // bleed the dark camera full-screen — that's what lets
+                        // the pill sit cleanly below the nav bar instead of
+                        // guessing a fixed offset.
+                        .padding(.top, proxy.safeAreaInsets.top + Theme.Space.s3)
+                        .padding(.horizontal, Theme.Space.s4)
+                    Spacer(minLength: 0)
                 }
             }
         }
@@ -59,10 +58,32 @@ struct ScanOverlay: View {
         .onDisappear { if torchOn { toggleTorch() } }   // never leave the flashlight on after leaving Scan
     }
 
+    // MARK: - Top bar (instruction pill + torch)
+
+    /// Balances the instruction pill so it reads visually centered whether or
+    /// not the torch button is present, matching the reference's
+    /// pill-top-center / control-top-corner layout (reference/moodboards
+    /// "Ingrex" dark scan screen).
+    private var topBar: some View {
+        HStack(spacing: Theme.Space.s3) {
+            Color.clear.frame(width: hasTorch ? 44 : 0)
+            Spacer(minLength: 0)
+            if showsInstruction {
+                instructionLabel
+            }
+            Spacer(minLength: 0)
+            if hasTorch {
+                torchButton
+            }
+        }
+    }
+
     // MARK: - Dimmed surround
 
     /// Full-screen scrim with a rounded-rect "hole" over the reticle, via an
     /// even-odd fill, so only the area outside the aim frame is dimmed.
+    /// Tinted from `Theme.ink` (the brand's near-black green) rather than raw
+    /// black — tokens only, per DESIGN_SYSTEM_V3 §7.
     private func dimmedSurround(fullSize: CGSize, holeCenter: CGPoint) -> some View {
         let hole = CGRect(
             x: holeCenter.x - reticleSize / 2,
@@ -74,7 +95,7 @@ struct ScanOverlay: View {
             path.addRect(CGRect(origin: .zero, size: fullSize))
             path.addRoundedRect(in: hole, cornerSize: CGSize(width: Theme.Radius.lg, height: Theme.Radius.lg))
         }
-        .fill(Color.black.opacity(0.35), style: FillStyle(eoFill: true))
+        .fill(Theme.ink.opacity(0.45), style: FillStyle(eoFill: true))
         .allowsHitTesting(false)
     }
 
@@ -83,24 +104,25 @@ struct ScanOverlay: View {
     private var reticle: some View {
         ZStack {
             ReticleCorners()
-                .stroke(reticleColor, style: StrokeStyle(lineWidth: isLocked ? 5 : 3.5, lineCap: .round, lineJoin: .round))
+                .stroke(Theme.green, style: StrokeStyle(lineWidth: isLocked ? 6 : 3.5, lineCap: .round, lineJoin: .round))
+                .shadow(color: isLocked ? Theme.green.opacity(0.55) : .clear, radius: isLocked ? 14 : 0)
             if !reduceMotion && !isLocked {
                 sweepLine
                     .frame(width: reticleSize - 24, height: 2)
                     .offset(y: sweepOffset)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isLocked)
+        .scaleEffect(isLocked ? 1.05 : 1.0)
+        .animation(Motion.respecting(Motion.quick, reduceMotion), value: isLocked)
         .allowsHitTesting(false)
     }
 
-    private var reticleColor: Color {
-        isLocked ? Theme.green : Theme.onGreen.opacity(0.9)
-    }
-
+    /// The calm sweep is the one "spark" moment lime is allowed on this dark
+    /// surface (DESIGN_SYSTEM_V3 §5.9) — the reticle itself stays brand green
+    /// at rest and locks brighter/thicker/glowing green on capture.
     private var sweepLine: some View {
         LinearGradient(
-            colors: [Theme.green.opacity(0), Theme.green.opacity(0.9), Theme.green.opacity(0)],
+            colors: [Theme.lime.opacity(0), Theme.lime.opacity(0.9), Theme.lime.opacity(0)],
             startPoint: .leading, endPoint: .trailing
         )
     }
@@ -117,7 +139,7 @@ struct ScanOverlay: View {
 
     private var instructionLabel: some View {
         Text("Point your camera at a barcode.")
-            .font(.subheadline)
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(Theme.onGreen)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
@@ -134,9 +156,10 @@ struct ScanOverlay: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(torchOn ? Theme.ink : Theme.onGreen)
                 .frame(minWidth: 44, minHeight: 44)
-                .background(torchOn ? Theme.lime : Color.black.opacity(0.35), in: Circle())
+                .background(torchOn ? Theme.lime : Theme.ink.opacity(0.55), in: Circle())
         }
         .accessibilityLabel(torchOn ? "Turn off flashlight" : "Turn on flashlight")
+        .accessibilityHint("Toggles the camera flashlight for low light.")
     }
 
     private func toggleTorch() {

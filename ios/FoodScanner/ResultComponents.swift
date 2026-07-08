@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 /// Supporting components for the product result screen (ProductView).
 /// Rebuilt to the Oasis-beating shape in docs/DESIGN_SYSTEM_V3.md §5 —
@@ -537,36 +538,279 @@ struct FloatingProductImage: View {
     }
 }
 
+// MARK: - Allergen matching (client-side only — no backend calls)
+
+/// Conservative, literal matching between the user's flagged allergies
+/// (`profile.allergies`, populated from onboarding's `CommonAllergen` raw
+/// values — see OnboardingView.swift, e.g. `"milk"`, `"tree_nuts"`) and
+/// either a product's allergen tags (`Product.allergens`, e.g. `"Milk"`,
+/// `"en:milk"`) or the free-text name of an ingredient. Deliberately NOT
+/// fuzzy/AI matching — every "match" here is a defensible, literal string
+/// comparison, per CLAUDE.md's "never fabricate" rule. Lives here (not a
+/// service) because it's pure, stateless, view-local logic with no
+/// persistence or network concerns of its own.
+enum AllergenMatch {
+    /// A tiny, deliberately small set of synonym groups for vocabulary drift
+    /// between onboarding's fixed allergy list and however a product's
+    /// allergen tags happen to be spelled (Open Food Facts–style tags, or
+    /// already-cleaned single words). Grouped only where onboarding itself
+    /// already treats two words as one concept (e.g. "Wheat / gluten" is a
+    /// single onboarding option) or where the synonym is unambiguous — never
+    /// a guess about ingredient chemistry.
+    private static let synonymGroups: [Set<String>] = [
+        ["tree nut", "tree nuts", "nut", "nuts"],
+        ["wheat", "gluten"], // onboarding presents these as one option
+        ["soy", "soya", "soybean", "soybeans"],
+        ["shellfish", "crustacean", "crustaceans"],
+        ["sesame", "sesame seed", "sesame seeds"],
+        ["egg", "eggs"],
+        ["peanut", "peanuts"],
+    ]
+
+    /// Normalizes one free-form tag (`"en:milk"`, `"tree_nuts"`, `"Milk"`)
+    /// down to its comparable forms: lowercased, locale-prefix stripped,
+    /// separators folded to spaces, plus its known synonyms and a naive
+    /// singular. Never fuzzy — this only folds together spellings that are
+    /// the *same* allergen.
+    static func canonicalForms(_ raw: String) -> Set<String> {
+        var s = raw.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let colon = s.firstIndex(of: ":") {
+            s = String(s[s.index(after: colon)...])
+        }
+        s = s.replacingOccurrences(of: "_", with: " ")
+        s = s.replacingOccurrences(of: "-", with: " ")
+        s = s.split(separator: " ").joined(separator: " ")
+        guard !s.isEmpty else { return [] }
+
+        var forms: Set<String> = [s]
+        if s.hasSuffix("s"), !s.hasSuffix("ss"), s.count > 3 {
+            forms.insert(String(s.dropLast()))
+        }
+        for group in synonymGroups where !group.isDisjoint(with: forms) {
+            forms.formUnion(group)
+        }
+        return forms
+    }
+
+    /// A calm display form for a raw allergen tag/profile value —
+    /// `"tree_nuts"` → `"Tree Nuts"`, `"en:milk"` → `"Milk"`.
+    static func displayName(_ raw: String) -> String {
+        var s = raw.lowercased()
+        if let colon = s.firstIndex(of: ":") { s = String(s[s.index(after: colon)...]) }
+        return s.replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .localizedCapitalized
+    }
+
+    /// True if a product's allergen tag is the same allergen as one the user
+    /// flagged in onboarding. Used for the alert banner and for emphasizing
+    /// chips.
+    static func tagMatches(_ productAllergen: String, flaggedAllergies: [String]) -> Bool {
+        let productForms = canonicalForms(productAllergen)
+        guard !productForms.isEmpty else { return false }
+        return flaggedAllergies.contains { !canonicalForms($0).isDisjoint(with: productForms) }
+    }
+
+    /// Returns the first flagged allergy whose canonical form appears as a
+    /// whole word in free text (an ingredient's name) — e.g. `"soy"` inside
+    /// `"Soy lecithin"`, or `"milk"` inside `"Nonfat milk"`. Whole-word only
+    /// (padded-space containment), so this never fires on a coincidental
+    /// substring. Used only for the ingredient-card personalization note,
+    /// never to alter a score or fabricate a safety verdict.
+    static func matchingFlaggedAllergy(inText text: String, flaggedAllergies: [String]) -> String? {
+        guard !flaggedAllergies.isEmpty else { return nil }
+        let cleaned = text.lowercased().map { (ch: Character) -> Character in
+            (ch.isLetter || ch.isWhitespace) ? ch : " "
+        }
+        let collapsed = String(cleaned).split(separator: " ").joined(separator: " ")
+        let padded = " \(collapsed) "
+        for allergy in flaggedAllergies {
+            for form in canonicalForms(allergy) where padded.contains(" \(form) ") {
+                return allergy
+            }
+        }
+        return nil
+    }
+}
+
+// MARK: - Allergen alert banner
+
+/// The result screen's most safety-relevant moment: a calm, dismissible
+/// banner shown only when a product contains an allergen the user flagged
+/// during onboarding (`profile.allergies`, read via `ProfileService`). This
+/// is the one place `Theme.critical` (via `Theme.ResultScreen.criticalOnLight`)
+/// is appropriate per docs/DESIGN_SYSTEM.md §2.5 — a user-flagged allergen
+/// really is a safety case — but the treatment stays a soft tint + hairline
+/// outline, never a solid alarm block, and the copy stays factual
+/// ("contains"/"may contain"), never "toxic"/"danger" (CLAUDE.md ED-safe
+/// rule). Softens to "may contain" when `isLimitedConfidence` is true, since
+/// a thin/partial product read shouldn't be asserted with false certainty.
+/// Collapsed by default (headline only); tapping it reveals one more line of
+/// calm context, and a separate 44pt control dismisses it for this viewing.
+struct AllergenAlertBanner: View {
+    let matchedAllergens: [String]
+    var isLimitedConfidence: Bool = false
+
+    @State private var isDismissed = false
+    @State private var isExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var namesList: String {
+        ListFormatter.localizedString(byJoining: matchedAllergens.map(AllergenMatch.displayName))
+    }
+
+    private var headline: String {
+        let verb = isLimitedConfidence ? "May contain" : "Contains"
+        return "\(verb) \(namesList), which you asked to avoid."
+    }
+
+    private var detail: String {
+        isLimitedConfidence
+            ? "Our data on this product is limited, so treat this as a heads-up rather than a certainty. Always check the label to confirm."
+            : "Always check the label to confirm — allergen data can change between products and batches."
+    }
+
+    var body: some View {
+        if !isDismissed {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                if isExpanded {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, Theme.Space.s2)
+                        .transition(.opacity)
+                }
+            }
+            .padding(Theme.Space.s4)
+            .background(
+                Theme.ResultScreen.criticalOnLight.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: Theme.Radius.md)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .strokeBorder(Theme.ResultScreen.criticalOnLight.opacity(0.35), lineWidth: 1)
+            )
+            .onAppear {
+                // VoiceOver-announced: a scanned allergen match is the kind
+                // of thing a VoiceOver user shouldn't have to discover only
+                // by swiping past it in reading order. `Text(verbatim:)`
+                // (rather than passing `headline` directly) sidesteps any
+                // ambiguity between `Announcement`'s `Text`/`LocalizedStringKey`
+                // initializer overloads for a runtime `String`.
+                AccessibilityNotification.Announcement(headline).post()
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: Theme.Space.s2) {
+            Button {
+                withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .top, spacing: Theme.Space.s3) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ResultScreen.criticalOnLight)
+                        .frame(width: 22)
+                        .accessibilityHidden(true)
+
+                    Text(headline)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(headline)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Double tap for more detail")
+
+            Button {
+                withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
+                    isDismissed = true
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss allergen alert")
+        }
+    }
+}
+
 /// Allergen chip — the one place cautionary styling is allowed (CLAUDE.md
-/// ED-safe rule + docs/DESIGN_SYSTEM.md §5.5), but kept CALM: an amber
-/// caution tone, never the alarm-red treatment. Informational, not a
+/// ED-safe rule + docs/DESIGN_SYSTEM.md §5.5), but kept CALM by default: an
+/// amber caution tone, never the alarm-red treatment. Informational, not a
 /// fear-based block — a small icon + name, matching Oasis's chip shape.
+/// `isFlagged` (true only when this allergen matches one in `profile
+/// .allergies`) steps the tone up to the restrained `criticalOnLight`
+/// family — still a soft fill + outline, just a touch more emphatic than the
+/// plain informational chips, per docs/DESIGN_SYSTEM.md §2.5.
 struct AllergenChip: View {
     let name: String
+    var isFlagged: Bool = false
+
+    private var tone: Color {
+        isFlagged ? Theme.ResultScreen.criticalOnLight : Theme.ResultScreen.warningTextOnLight
+    }
+    private var fillColor: Color {
+        isFlagged ? Theme.ResultScreen.criticalOnLight : Theme.scoreMid
+    }
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "exclamationmark.triangle.fill").font(.caption2)
-            Text(name.localizedCapitalized).font(.caption.weight(.medium))
+            Text(AllergenMatch.displayName(name)).font(.caption.weight(isFlagged ? .bold : .medium))
         }
-        .foregroundStyle(Theme.ResultScreen.warningTextOnLight)
+        .foregroundStyle(tone)
         .padding(.horizontal, Theme.Space.s3)
         .padding(.vertical, 6)
-        .background(Theme.scoreMid.opacity(0.12), in: Capsule())
+        .background(fillColor.opacity(isFlagged ? 0.16 : 0.12), in: Capsule())
         .overlay(
-            Capsule().strokeBorder(Theme.scoreMid.opacity(0.4), lineWidth: 1)
+            Capsule().strokeBorder(fillColor.opacity(isFlagged ? 0.55 : 0.4), lineWidth: 1)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            isFlagged
+                ? "\(AllergenMatch.displayName(name)) — matches an allergy in your profile"
+                : AllergenMatch.displayName(name)
         )
     }
 }
 
 struct AllergenChipsRow: View {
     let allergens: [String]
+    /// The user's flagged allergies (`profile.allergies`), for emphasizing
+    /// the chips that actually matter to them. Empty by default so every
+    /// existing call site keeps rendering the plain, unemphasized row.
+    var flaggedAllergies: [String] = []
+
+    private func isFlagged(_ allergen: String) -> Bool {
+        AllergenMatch.tagMatches(allergen, flaggedAllergies: flaggedAllergies)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s2) {
             FlowLayout(spacing: Theme.Space.s2) {
                 ForEach(allergens, id: \.self) { allergen in
-                    AllergenChip(name: allergen)
+                    AllergenChip(name: allergen, isFlagged: isFlagged(allergen))
                 }
             }
             Text("Always check the label to confirm.")
@@ -574,7 +818,17 @@ struct AllergenChipsRow: View {
                 .foregroundStyle(Theme.textSecondary)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Contains allergens: \(allergens.joined(separator: ", ")). Always check the label to confirm.")
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        let described = allergens.map { allergen -> String in
+            isFlagged(allergen)
+                ? "\(AllergenMatch.displayName(allergen)), which you asked to avoid"
+                : AllergenMatch.displayName(allergen)
+        }
+        let list = ListFormatter.localizedString(byJoining: described)
+        return "Contains allergens: \(list). Always check the label to confirm."
     }
 }
 
@@ -588,11 +842,26 @@ struct AllergenChipsRow: View {
 /// all renders as a neutral calm card instead of a scary empty state.
 struct IngredientCard: View {
     let ingredient: Ingredient
+    /// The user's flagged allergies (`profile.allergies`) — enables a small,
+    /// neutral, client-side-only personalization note when this specific
+    /// ingredient's name literally names one of them (e.g. "Soy lecithin"
+    /// when the user flagged soy). Empty by default so every existing call
+    /// site renders exactly as before. Never fabricated — only shown on a
+    /// real, literal name match; see `AllergenMatch.matchingFlaggedAllergy`.
+    var flaggedAllergies: [String] = []
+
     @State private var isExpanded = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var riskTier: String? { ingredient.riskTier?.lowercased() }
+
+    /// The flagged allergy this ingredient's name literally names, if any —
+    /// e.g. `"milk"` for an ingredient named "Nonfat milk". `nil` (not an
+    /// empty note) when there's no real match, so nothing is ever invented.
+    private var matchedFlaggedAllergy: String? {
+        AllergenMatch.matchingFlaggedAllergy(inText: ingredient.name, flaggedAllergies: flaggedAllergies)
+    }
 
     /// True once we have *any* vetted content to show — matches the backend
     /// contract where a not-yet-explained ingredient (e.g. "Natural
@@ -633,6 +902,12 @@ struct IngredientCard: View {
                 Text(ingredient.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
+
+                if let matchedFlaggedAllergy {
+                    Text("You asked to avoid \(AllergenMatch.displayName(matchedFlaggedAllergy)).")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(Theme.textSecondary)
+                }
 
                 if hasVettedInfo {
                     if let what = ingredient.what, !what.isEmpty {
@@ -1164,6 +1439,24 @@ struct ResultSkeletonView: View {
         .background(Theme.canvas)
 }
 
+#Preview("Allergen chips — flagged match emphasized, still calm") {
+    AllergenChipsRow(allergens: ["Milk", "Wheat", "Soy"], flaggedAllergies: ["milk"])
+        .padding()
+        .background(Theme.canvas)
+}
+
+#Preview("Allergen alert banner — collapsed, single match") {
+    AllergenAlertBanner(matchedAllergens: ["milk"])
+        .padding()
+        .background(Theme.canvas)
+}
+
+#Preview("Allergen alert banner — limited confidence, multiple matches") {
+    AllergenAlertBanner(matchedAllergens: ["milk", "tree_nuts"], isLimitedConfidence: true)
+        .padding()
+        .background(Theme.canvas)
+}
+
 #Preview("Tri-metric row") {
     TriMetricRow(factors: [
         ScoreFactor(name: "Nutrition", subScore: 30, weight: 0.35, detail: "", sources: []),
@@ -1198,6 +1491,12 @@ struct ResultSkeletonView: View {
                 name: "Natural flavouring", what: nil, whyUsed: nil, safety: nil, riskTier: nil,
                 whoShouldAvoid: [], misconceptions: [], foundIn: [], sources: [], confidence: "limited"
             ))
+            IngredientCard(ingredient: Ingredient(
+                name: "Nonfat milk", what: "A dairy ingredient made by removing fat from milk.",
+                whyUsed: "Adds creaminess and protein.", safety: "Generally recognized as safe.",
+                riskTier: "low", whoShouldAvoid: [], misconceptions: [], foundIn: [],
+                sources: [], confidence: "high"
+            ), flaggedAllergies: ["milk"])
         }
         .padding()
     }

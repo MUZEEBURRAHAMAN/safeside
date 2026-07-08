@@ -287,14 +287,25 @@ struct ScanScreen: View {
         case .ready:
             scannerBody
         case .unsupportedDevice:
-            ContentUnavailableView(
-                "Camera unavailable",
+            unavailableView(
                 systemImage: "camera",
-                description: Text("Scanning needs a device camera. Run on a real iPhone.")
+                title: "Camera unavailable",
+                description: "Scanning needs a device camera. Run on a real iPhone."
             )
         case .permissionDenied:
             permissionDeniedView
         }
+    }
+
+    /// Calm, light-canvas styling for the two "can't show the camera" states
+    /// (DESIGN_SYSTEM_V3 §1: dark is a moment, not the mode — these aren't the
+    /// immersive scan moment, so they read as a normal light-first screen,
+    /// not the dark camera treatment).
+    private func unavailableView(systemImage: String, title: String, description: String) -> some View {
+        ContentUnavailableView(title, systemImage: systemImage, description: Text(description))
+            .tint(Theme.greenDeep)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.canvas)
     }
 
     private var scannerBody: some View {
@@ -366,15 +377,41 @@ struct ScanScreen: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func calmBanner(title: String, message: String, actionTitle: String,
-                             action: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Text(title).font(.headline).foregroundStyle(Theme.onGreen)
-            Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
-            Button(actionTitle, action: action)
+    // MARK: - Banner button styles (v3 card language on the dark surface)
+
+    /// Filled lime pill, ink label — the primary action in a banner. Full
+    /// pill (`Radius.full` via `Capsule`), 44pt tall per DESIGN_SYSTEM_V3 §5.1/§7.
+    private func primaryPillButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.bold())
+                .foregroundStyle(Theme.ink)
+                .frame(minHeight: 44)
+                .padding(.horizontal, Theme.Space.s4)
+        }
+        .background(Theme.lime, in: Capsule())
+    }
+
+    /// Quiet lime-label text action — the secondary/way-out option beside a
+    /// primary pill (e.g. "Try another scan").
+    private func secondaryPillButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
                 .font(.subheadline.bold())
                 .foregroundStyle(Theme.lime)
                 .frame(minHeight: 44)
+                .padding(.horizontal, Theme.Space.s2)
+        }
+    }
+
+    private func calmBanner(title: String, message: String, actionTitle: String,
+                             action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s3) {
+            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                Text(title).font(.headline).foregroundStyle(Theme.onGreen)
+                Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
+            }
+            primaryPillButton(actionTitle, action: action)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Space.s4)
@@ -391,32 +428,23 @@ struct ScanScreen: View {
     private func ocrBanner(title: String, message: String, hint: String?,
                             primaryTitle: String, primaryAction: @escaping () -> Void,
                             secondaryTitle: String, secondaryAction: @escaping () -> Void) -> some View {
-        let primaryButton = Button(primaryTitle, action: primaryAction)
-            .font(.subheadline.bold())
-            .foregroundStyle(Theme.ink)
-            .frame(minHeight: 44)
-            .padding(.horizontal, Theme.Space.s4)
-            .background(Theme.lime, in: Capsule())
-        let secondaryButton = Button(secondaryTitle, action: secondaryAction)
-            .font(.subheadline.bold())
-            .foregroundStyle(Theme.lime)
-            .frame(minHeight: 44)
-
-        return VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Text(title).font(.headline).foregroundStyle(Theme.onGreen)
-            Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
-            if let hint {
-                Text(hint).font(.footnote).foregroundStyle(Theme.onGreen.opacity(0.7))
+        VStack(alignment: .leading, spacing: Theme.Space.s3) {
+            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                Text(title).font(.headline).foregroundStyle(Theme.onGreen)
+                Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
+                if let hint {
+                    Text(hint).font(.footnote).foregroundStyle(Theme.onGreen.opacity(0.7))
+                }
             }
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: Theme.Space.s3) {
-                    primaryButton
-                    secondaryButton
+                    primaryPillButton(primaryTitle, action: primaryAction)
+                    secondaryPillButton(secondaryTitle, action: secondaryAction)
                 }
             } else {
                 HStack(spacing: Theme.Space.s3) {
-                    primaryButton
-                    secondaryButton
+                    primaryPillButton(primaryTitle, action: primaryAction)
+                    secondaryPillButton(secondaryTitle, action: secondaryAction)
                 }
             }
         }
@@ -427,19 +455,30 @@ struct ScanScreen: View {
         .padding(Theme.Space.s4)
     }
 
+    /// Calm light-canvas permission explainer (DESIGN_SYSTEM_V3 §1 — not the
+    /// dark camera moment) with a full-pill "Open Settings" CTA.
     private var permissionDeniedView: some View {
         ContentUnavailableView {
             Label("Camera's off", systemImage: "camera.fill")
         } description: {
             Text("Turn it on in Settings to scan.")
         } actions: {
-            Button("Open Settings") {
+            Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+            } label: {
+                Text("Open Settings")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(Theme.onGreen)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, Theme.Space.s5)
             }
-            .frame(minHeight: 44)
+            .background(Theme.greenDeep, in: Capsule())
             .accessibilityHint("Opens the Settings app so you can allow camera access.")
         }
+        .tint(Theme.greenDeep)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas)
     }
 }

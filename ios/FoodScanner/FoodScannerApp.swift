@@ -22,14 +22,19 @@ struct FoodScannerApp: App {
     var body: some Scene {
         WindowGroup {
 #if DEBUG
-            // Screenshot harness: `SHOW_SAMPLE_RESULT=1` boots straight into a
-            // populated ProductView so detail screens can be verified on the
-            // simulator without a live scan/tap. DEBUG-only.
-            if ProcessInfo.processInfo.environment["SHOW_SAMPLE_RESULT"] == "1" {
-                NavigationStack { ProductView(product: .sampleScored) }
-                    .environment(session)
-                    .environment(pantryService)
-                    .tint(Theme.greenDeep)
+            // Screenshot harness: boot straight into one screen so it can be
+            // verified on the simulator without live tapping. DEBUG-only.
+            //   SHOW_SAMPLE_RESULT=1  → populated ProductView
+            //   SHOW_SCREEN=me|plan|onboarding|result
+            if ProcessInfo.processInfo.environment["SHOW_SAMPLE_RESULT"] == "1"
+                || ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "result" {
+                harness { NavigationStack { ProductView(product: .sampleScored) } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "me" {
+                harness { MeView() }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "plan" {
+                harness { PlanView() }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "onboarding" {
+                harness { OnboardingView {} }
             } else {
                 appBody
             }
@@ -38,6 +43,17 @@ struct FoodScannerApp: App {
 #endif
         }
     }
+
+#if DEBUG
+    /// Wraps a harness root with all services injected (matches appBody).
+    private func harness<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .environment(session)
+            .environment(pantryService)
+            .environment(profileService)
+            .tint(Theme.greenDeep)
+    }
+#endif
 
     private var appBody: some View {
             RootTabView()
@@ -66,10 +82,10 @@ struct RootTabView: View {
             NavigationStack { ScanScreen() }
                 .tabItem { Label("Scan", systemImage: "barcode.viewfinder") }
 
-            Text("Plan — coming in Phase 2")
+            PlanView()
                 .tabItem { Label("Plan", systemImage: "square.grid.2x2") }
 
-            Text("Me — profile, goals, settings")
+            MeView()
                 .tabItem { Label("Me", systemImage: "person") }
         }
     }

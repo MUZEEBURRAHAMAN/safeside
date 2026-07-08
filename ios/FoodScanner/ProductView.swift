@@ -15,6 +15,11 @@ struct ProductView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
+    /// Optional (not `.self`-required) so this view never crashes if a
+    /// caller's tree doesn't happen to inject `ProfileService` — a
+    /// guest/no-profile viewer of this screen should just see the same
+    /// screen as before this feature existed (see `flaggedAllergies` below).
+    @Environment(ProfileService.self) private var profileService: ProfileService?
 
     @State private var identityVisible = false
 
@@ -72,6 +77,23 @@ struct ProductView: View {
 
     private var apiClient: APIClient { APIClient(session: session) }
 
+    /// The user's flagged allergies (`profile.allergies`) — empty for a
+    /// guest, a signed-in-but-still-loading profile, or a profile that
+    /// skipped the question, all of which should render this screen exactly
+    /// as it did before this feature existed (no banner, no chip emphasis,
+    /// no ingredient notes).
+    private var flaggedAllergies: [String] {
+        profileService?.profile?.allergies ?? []
+    }
+
+    /// This product's allergens that match one of the user's flagged
+    /// allergies — client-side only (`AllergenMatch`), never a backend call.
+    /// Drives the alert banner; empty means "no banner."
+    private var flaggedAllergenMatches: [String] {
+        guard !flaggedAllergies.isEmpty else { return [] }
+        return workingProduct.allergens.filter { AllergenMatch.tagMatches($0, flaggedAllergies: flaggedAllergies) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.s5) {
@@ -79,6 +101,8 @@ struct ProductView: View {
                     .opacity(identityVisible ? 1 : 0)
                     .scaleEffect(identityVisible ? 1 : 0.97)
                     .onAppear { revealIdentity() }
+
+                allergenAlertBannerOrNone
 
                 triMetricSectionOrNone
 
@@ -212,6 +236,21 @@ struct ProductView: View {
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
     }
 
+    /// Allergen alert — the safety wedge (see CLAUDE.md non-negotiable #2:
+    /// ED-safe, informational not fear-based). Renders only when a scanned
+    /// product actually contains an allergen the user flagged during
+    /// onboarding; a guest or an allergy-free profile sees no change to this
+    /// screen at all (principle: never a false alarm, never a dead-end).
+    @ViewBuilder
+    private var allergenAlertBannerOrNone: some View {
+        if !flaggedAllergenMatches.isEmpty {
+            AllergenAlertBanner(
+                matchedAllergens: flaggedAllergenMatches,
+                isLimitedConfidence: workingProduct.dataConfidence.lowercased() != "high"
+            )
+        }
+    }
+
     /// 4) Tri-metric row — only shown once we actually have factor data, so
     /// it never fabricates sub-scores for a thin/unscored product (the "why"
     /// section right below already covers that case in words).
@@ -272,7 +311,7 @@ struct ProductView: View {
                 } else {
                     VStack(alignment: .leading, spacing: Theme.Space.s3) {
                         ForEach(displayIngredients) { ingredient in
-                            IngredientCard(ingredient: ingredient)
+                            IngredientCard(ingredient: ingredient, flaggedAllergies: flaggedAllergies)
                         }
                     }
                 }
@@ -289,7 +328,7 @@ struct ProductView: View {
                 Text("Allergens")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                AllergenChipsRow(allergens: workingProduct.allergens)
+                AllergenChipsRow(allergens: workingProduct.allergens, flaggedAllergies: flaggedAllergies)
             }
         }
     }
@@ -375,6 +414,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
 }
 
 #Preview("High score — high confidence") {
@@ -383,6 +423,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
 }
 
 #Preview("Low score — limited confidence") {
@@ -391,6 +432,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
 }
 
 #Preview("Unknown score — no data") {
@@ -399,6 +441,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
 }
 
 #Preview("From pantry — thin read") {
@@ -407,6 +450,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
 }
 
 #Preview("Accessibility XXL Dynamic Type") {
@@ -415,6 +459,7 @@ struct ProductView: View {
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
     .dynamicTypeSize(.accessibility3)
 }
 
