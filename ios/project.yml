@@ -20,6 +20,11 @@ configFiles:
   Debug: Config.xcconfig
   Release: Config.xcconfig
 
+# Surface the xcconfig files in the navigator instead of "Recovered References".
+fileGroups:
+  - Config.xcconfig
+  - Config-example.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "5.10"
