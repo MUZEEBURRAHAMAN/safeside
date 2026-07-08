@@ -8,9 +8,47 @@ struct ProductView: View {
     let product: Product
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
+    @Environment(SessionService.self) private var session
+    @Environment(PantryService.self) private var pantryService
+
     @State private var heroVisible = false
 
-    private var band: ScoreBand { product.score?.band ?? .unknown }
+    /// Working copy of `product`. `product` itself never changes (it's the
+    /// caller's contract), but a pantry-list entry arrives "thin" — score
+    /// with no `factors`, no `ingredients` — so this view fills in the rest
+    /// in the background without ever blocking the initial render.
+    @State private var workingProduct: Product
+
+    /// Ingredients fetched lazily via `APIClient.ingredients(productID:)`,
+    /// kept separate from `workingProduct.ingredients` per the lazy-load
+    /// contract; `displayIngredients` below reconciles the two sources.
+    @State private var fetchedIngredients: [Ingredient] = []
+    @State private var ingredientsPhase: IngredientsLoadPhase = .idle
+
+    @State private var showBetterOptionSheet = false
+
+    private enum IngredientsLoadPhase: Equatable { case idle, loading, failed }
+
+    init(product: Product) {
+        self.product = product
+        _workingProduct = State(initialValue: product)
+    }
+
+    private var band: ScoreBand { workingProduct.score?.band ?? .unknown }
+
+    /// A pantry-list read has a `score` with empty `factors` (see
+    /// `PantryEntry.asProduct()`); an unscored product has no `score` at
+    /// all. Both count as "thin" and are worth a background re-fetch.
+    private var hasThinScore: Bool {
+        workingProduct.score?.factors.isEmpty ?? true
+    }
+
+    private var displayIngredients: [Ingredient] {
+        workingProduct.ingredients.isEmpty ? fetchedIngredients : workingProduct.ingredients
+    }
+
+    private var apiClient: APIClient { APIClient(session: session) }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -26,10 +64,11 @@ struct ProductView: View {
                     whyScoreOrNote
                         .id("whyScore")
 
-                    // Next action — never a dead-end, even when the swaps
-                    // engine isn't built yet (stubbed for now).
+                    // Next action — never a dead-end. The swaps engine isn't
+                    // built yet (Phase 3), so this opens a calm sheet with a
+                    // real, generic next step instead of a fabricated swap.
                     NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
-                        // TODO: wire to the swaps engine once it exists.
+                        showBetterOptionSheet = true
                     }
 
                     ingredientsSection
@@ -42,6 +81,19 @@ struct ProductView: View {
             .background(Theme.canvas)
             .navigationBarTitleDisplayMode(.inline)
         }
+        .sheet(isPresented: $showBetterOptionSheet) {
+            NextActionSheet(band: band) {
+                showBetterOptionSheet = false
+                dismiss()
+            }
+        }
+        .task {
+            // Order matters: the pantry re-fetch can itself populate
+            // ingredients, so the lazy ingredients load only hits the
+            // network if that didn't already happen.
+            await refreshThinPantryDataIfNeeded()
+            await loadIngredientsIfNeeded()
+        }
     }
 
     // MARK: Sections
@@ -49,32 +101,50 @@ struct ProductView: View {
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s3) {
             HStack(alignment: .top, spacing: Theme.Space.s3) {
-                ProductThumbnail(urlString: product.imageURL)
+                ProductThumbnail(urlString: workingProduct.imageURL)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(product.name)
+                    Text(workingProduct.name)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let brand = product.brand, !brand.isEmpty {
+                    if let brand = workingProduct.brand, !brand.isEmpty {
                         Text(brand)
                             .font(.subheadline)
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Theme.Space.s2)
+                favoriteButton
             }
 
-            if !product.allergens.isEmpty {
-                AllergenChipsRow(allergens: product.allergens)
+            if !workingProduct.allergens.isEmpty {
+                AllergenChipsRow(allergens: workingProduct.allergens)
             }
         }
     }
 
+    /// Brand-tinted (not alarm-colored) heart toggle. Reads
+    /// `pantryService.isFavorite(_:)` directly in `body` (rather than
+    /// mirroring it into local `@State`) so it stays in sync whenever the
+    /// `@Observable` PantryService's backing data changes elsewhere.
+    private var favoriteButton: some View {
+        let isFavorite = pantryService.isFavorite(workingProduct.id)
+        return Button {
+            Task { await pantryService.toggleFavorite(productID: workingProduct.id) }
+        } label: {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.greenDeep)
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+    }
+
     private func heroSection(proxy: ScrollViewProxy) -> some View {
         ScoreHeroSection(
-            score: product.score?.score,
+            score: workingProduct.score?.score,
             band: band,
-            confidence: product.score?.confidence,
+            confidence: workingProduct.score?.confidence,
             onInfoTap: {
                 let animation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.3)
                 withAnimation(animation) {
@@ -86,7 +156,7 @@ struct ProductView: View {
 
     @ViewBuilder
     private var whyScoreOrNote: some View {
-        if let score = product.score {
+        if let score = workingProduct.score, !score.factors.isEmpty {
             WhyScoreCard(score: score)
         } else {
             SectionCard {
@@ -109,20 +179,86 @@ struct ProductView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
 
-            if product.ingredients.isEmpty {
-                EmptyIngredientsView()
-            } else {
-                SectionCard {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(product.ingredients.enumerated()), id: \.element.id) { index, ingredient in
-                            IngredientRow(ingredient: ingredient)
-                            if index < product.ingredients.count - 1 {
-                                HairlineDivider()
+            switch ingredientsPhase {
+            case .loading:
+                IngredientsSkeletonView()
+            case .failed:
+                IngredientsLoadErrorView {
+                    Task { await loadIngredientsIfNeeded(forceRetry: true) }
+                }
+            case .idle:
+                if displayIngredients.isEmpty {
+                    EmptyIngredientsView()
+                } else {
+                    SectionCard {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(displayIngredients.enumerated()), id: \.element.id) { index, ingredient in
+                                IngredientRow(ingredient: ingredient)
+                                if index < displayIngredients.count - 1 {
+                                    HairlineDivider()
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // MARK: Data loading
+
+    /// Pantry-detail fix: a product opened from the pantry list arrives with
+    /// an empty `factors`/`ingredients` (a "thin" read — see
+    /// `PantryEntry.asProduct()`). Re-fetch the full product by barcode and
+    /// merge in whatever's missing, without ever overwriting data that's
+    /// already full.
+    private func refreshThinPantryDataIfNeeded() async {
+        guard hasThinScore, let barcode = workingProduct.barcode, !barcode.isEmpty else { return }
+        do {
+            let fresh = try await apiClient.product(barcode: barcode)
+            mergeFullProduct(fresh)
+        } catch {
+            // Silent by design: this is background enrichment on top of a
+            // screen that's already showing whatever the pantry list had.
+            // A calm, already-visible result beats an error banner here.
+        }
+    }
+
+    private func mergeFullProduct(_ fresh: Product) {
+        let mergedScore: ScoreResult?
+        if let current = workingProduct.score, !current.factors.isEmpty {
+            mergedScore = current // already full — never regress
+        } else {
+            mergedScore = fresh.score ?? workingProduct.score
+        }
+
+        workingProduct = Product(
+            id: workingProduct.id,
+            barcode: workingProduct.barcode,
+            name: workingProduct.name,
+            brand: workingProduct.brand ?? fresh.brand,
+            imageURL: workingProduct.imageURL ?? fresh.imageURL,
+            score: mergedScore,
+            ingredients: workingProduct.ingredients.isEmpty ? fresh.ingredients : workingProduct.ingredients,
+            allergens: workingProduct.allergens.isEmpty ? fresh.allergens : workingProduct.allergens,
+            dataConfidence: fresh.dataConfidence
+        )
+    }
+
+    /// Lazy-loads AI ingredient explanations (backend now returns additive +
+    /// text explanations). Never runs if ingredients are already present —
+    /// either from the initial `product`, or filled in by the pantry
+    /// re-fetch above.
+    private func loadIngredientsIfNeeded(forceRetry: Bool = false) async {
+        guard workingProduct.ingredients.isEmpty else { return }
+        guard forceRetry || fetchedIngredients.isEmpty else { return }
+        ingredientsPhase = .loading
+        do {
+            let result = try await apiClient.ingredients(productID: workingProduct.id)
+            fetchedIngredients = result
+            ingredientsPhase = .idle
+        } catch {
+            ingredientsPhase = .failed
         }
     }
 
@@ -148,18 +284,32 @@ struct ProductView: View {
     NavigationStack {
         ProductView(product: .previewHighFullConfidence)
     }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
 }
 
 #Preview("Low score — limited confidence") {
     NavigationStack {
         ProductView(product: .previewLowLimitedConfidence)
     }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
 }
 
 #Preview("Unknown score") {
     NavigationStack {
         ProductView(product: .previewUnknownScore)
     }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
+}
+
+#Preview("From pantry — thin read") {
+    NavigationStack {
+        ProductView(product: .previewFromPantryThin)
+    }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
 }
 
 fileprivate extension Product {
@@ -266,6 +416,22 @@ fileprivate extension Product {
         ingredients: [],
         allergens: [],
         dataConfidence: "limited"
+    )
+
+    /// Mirrors `PantryEntry.asProduct()`'s thin read: a real `score` (so the
+    /// hero shows a number/band immediately) but empty `factors` and empty
+    /// `ingredients` — this is exactly the shape that should trigger
+    /// `refreshThinPantryDataIfNeeded()` on appear.
+    static let previewFromPantryThin = Product(
+        id: "4",
+        barcode: "1112223334445",
+        name: "Sourdough Bread",
+        brand: "Corner Bakery",
+        imageURL: nil,
+        score: ScoreResult(score: 71, band: .mid, confidence: "high", factors: [], scoreVersion: "1.0"),
+        ingredients: [],
+        allergens: ["Wheat"],
+        dataConfidence: "high"
     )
 }
 

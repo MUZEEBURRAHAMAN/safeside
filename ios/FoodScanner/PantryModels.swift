@@ -307,3 +307,38 @@ struct PantryEntry: Identifiable {
         )
     }
 }
+
+/// A "trending healthy" entry for Home — a globally top-scoring cached
+/// product (docs/DATA_MODEL.md `products` + `score_results`), NOT a
+/// pantry item. No `PantryItemRow` backs this: the user may never have
+/// scanned it. See `PantryService.loadTrending`.
+struct TrendingEntry: Identifiable {
+    let product: ProductRow
+    let score: ScoreResultRow
+
+    var id: String { product.id }
+    var band: ScoreBand { score.band }
+
+    /// Builds a `Product` for `ProductView(product:)` from cached data only
+    /// (no network re-fetch) — same graceful-degradation notes as
+    /// `PantryEntry.asProduct()` apply (no ingredients/factors cached here).
+    func asProduct() -> Product {
+        Product(
+            id: product.id,
+            barcode: product.barcode,
+            name: product.name,
+            brand: product.brand,
+            imageURL: product.images?.bestURL,
+            score: ScoreResult(
+                score: score.score,
+                band: score.band,
+                confidence: score.confidence,
+                factors: [],
+                scoreVersion: score.scoreVersion
+            ),
+            ingredients: [],
+            allergens: product.allergensTags ?? [],
+            dataConfidence: product.dataConfidence ?? "limited"
+        )
+    }
+}

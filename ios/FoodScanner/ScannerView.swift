@@ -5,8 +5,15 @@ import Vision
 import VisionKit
 
 /// Barcode scanning via VisionKit DataScannerViewController (first-party, iOS 16+).
-/// See docs/NATIVE_IOS_STACK.md. Vision OCR is the label fallback (add later).
+/// See docs/NATIVE_IOS_STACK.md. Vision OCR label fallback lives in
+/// VisionOCR.swift — `captureHandle` is handed the live scanner instance
+/// below so ScanScreen can call `capturePhoto()` on it on demand (see
+/// VisionOCR.swift for why that beats a second AVCaptureSession). Barcode
+/// symbologies/detection/haptics below are unchanged.
 struct ScannerView: UIViewControllerRepresentable {
+    /// Handed the live `DataScannerViewController` once created, so the OCR
+    /// fallback (VisionOCR.swift) can capture a still frame on demand.
+    var captureHandle: ScannerCaptureHandle
     var onBarcode: (String) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
@@ -33,6 +40,7 @@ struct ScannerView: UIViewControllerRepresentable {
             isHighlightingEnabled: false
         )
         scanner.delegate = context.coordinator
+        captureHandle.attach(scanner)
         // If the user hasn't been asked for camera permission yet, this is the
         // moment iOS presents the system prompt (DataScannerViewController
         // handles it — no manual AVCaptureDevice.requestAccess needed).
@@ -109,6 +117,12 @@ final class ScanViewModel {
         case lookingUp
         case error(String)
         case needsOCR
+        /// A "Snap the label" / "Try again" tap just fired `capturePhoto()`
+        /// and Vision `VNRecognizeTextRequest` is running (VisionOCR.swift).
+        case capturingLabel
+        /// Vision found no readable text in the captured frame (or the
+        /// capture itself failed) — calm retry, not an error state.
+        case labelNotFound
     }
 
     private(set) var phase: Phase = .scanning
@@ -163,6 +177,44 @@ final class ScanViewModel {
         }
     }
 
+    /// OCR fallback (docs/BACKEND_SPEC.md §2 step 6): captures a still frame
+    /// from the live scanner (VisionOCR.swift) and runs on-device Vision text
+    /// recognition on it, then sends the recognized text through the same
+    /// provisional-scoring endpoint a barcode lookup would use. Reuses
+    /// `isLookingUp` so a capture and a barcode lookup can never race.
+    @MainActor
+    func captureLabel(handle: ScannerCaptureHandle, api: APIClient, pantryService: PantryService) async {
+        guard !isLookingUp, !showProduct else { return }
+        isLookingUp = true
+        defer { isLookingUp = false }
+        phase = .capturingLabel
+
+        do {
+            guard let text = try await handle.captureLabelText() else {
+                phase = .labelNotFound
+                return
+            }
+            let product = try await api.analyzeLabel(text: text)
+            self.product = product
+            phase = .scanning
+            showProduct = true
+            // Same fire-and-forget pantry save as a barcode scan. OCR results
+            // are limited-confidence (backend sets source=ocr/confidence=
+            // limited) — Product.dataConfidence + ProductView already surface
+            // that; nothing extra to do here.
+            pantryService.save(product: product)
+        } catch let error as APIClient.APIError {
+            // A real network/backend failure — same generic, actionable
+            // error banner a barcode lookup would show.
+            phase = .error(error.errorDescription ?? "Something went wrong. Try again.")
+        } catch {
+            // Capture/Vision-side failure (camera busy, no frame, no text
+            // recognized) — calm "couldn't read that" recovery, since the
+            // likely fix is lighting/positioning, not "something went wrong."
+            phase = .labelNotFound
+        }
+    }
+
     /// Re-arms scanning — called on Retry/"Try another scan", and when the
     /// user navigates back from a product (see ScanScreen).
     func reset() {
@@ -199,7 +251,11 @@ struct ScanScreen: View {
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var vm = ScanViewModel()
+    // Handed to ScannerView so it can attach the live DataScannerViewController;
+    // ScanScreen uses it to trigger an on-demand OCR capture (VisionOCR.swift).
+    @State private var captureHandle = ScannerCaptureHandle()
     // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
     // and @State default values are evaluated outside the main actor).
     @State private var availability = CameraAvailability.ready
@@ -243,7 +299,7 @@ struct ScanScreen: View {
 
     private var scannerBody: some View {
         ZStack {
-            ScannerView { code in
+            ScannerView(captureHandle: captureHandle) { code in
                 Task { await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService) }
             }
             .ignoresSafeArea()
@@ -260,23 +316,29 @@ struct ScanScreen: View {
         case .scanning:
             EmptyView()
         case .lookingUp:
-            HStack(spacing: Theme.Space.s2) {
-                ProgressView().tint(Theme.onGreen)
-                Text("Reading the barcode…")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.onGreen)
-            }
-            .padding(Theme.Space.s4)
-            .background(Theme.forest.opacity(0.92))
-            .clipShape(Capsule())
-            .padding(.bottom, Theme.Space.s6)
-            .accessibilityElement(children: .combine)
+            labeledSpinner("Reading the barcode…")
+        case .capturingLabel:
+            labeledSpinner("Reading the label…")
         case .needsOCR:
-            calmBanner(
+            ocrBanner(
                 title: "We don't have this one yet.",
                 message: "Snap the ingredients label and we'll score it.",
-                actionTitle: "Try another scan"
-            ) { vm.reset() }
+                hint: "Line up the ingredients + nutrition panel.",
+                primaryTitle: "Snap the label",
+                primaryAction: { Task { await captureLabel() } },
+                secondaryTitle: "Try another scan",
+                secondaryAction: { vm.reset() }
+            )
+        case .labelNotFound:
+            ocrBanner(
+                title: "Couldn't read that.",
+                message: "Try again in better light.",
+                hint: nil,
+                primaryTitle: "Try again",
+                primaryAction: { Task { await captureLabel() } },
+                secondaryTitle: "Try another scan",
+                secondaryAction: { vm.reset() }
+            )
         case .error(let message):
             calmBanner(
                 title: "Something went wrong.",
@@ -284,6 +346,24 @@ struct ScanScreen: View {
                 actionTitle: "Retry"
             ) { vm.reset() }
         }
+    }
+
+    private func captureLabel() async {
+        await vm.captureLabel(handle: captureHandle, api: APIClient(session: session), pantryService: pantryService)
+    }
+
+    private func labeledSpinner(_ text: String) -> some View {
+        HStack(spacing: Theme.Space.s2) {
+            ProgressView().tint(Theme.onGreen)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(Theme.onGreen)
+        }
+        .padding(Theme.Space.s4)
+        .background(Theme.forest.opacity(0.92))
+        .clipShape(Capsule())
+        .padding(.bottom, Theme.Space.s6)
+        .accessibilityElement(children: .combine)
     }
 
     private func calmBanner(title: String, message: String, actionTitle: String,
@@ -295,6 +375,50 @@ struct ScanScreen: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(Theme.lime)
                 .frame(minHeight: 44)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Space.s4)
+        .background(Theme.forest.opacity(0.94))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .padding(Theme.Space.s4)
+    }
+
+    /// Two-action calm banner for the OCR fallback states (`needsOCR` /
+    /// `labelNotFound`) — always offers a way forward (Snap the label / Try
+    /// again) *and* a way out (Try another scan), so OCR is never a dead end
+    /// (CLAUDE.md principle 4). Buttons stack vertically at accessibility
+    /// Dynamic Type sizes so labels never truncate/clip side by side.
+    private func ocrBanner(title: String, message: String, hint: String?,
+                            primaryTitle: String, primaryAction: @escaping () -> Void,
+                            secondaryTitle: String, secondaryAction: @escaping () -> Void) -> some View {
+        let primaryButton = Button(primaryTitle, action: primaryAction)
+            .font(.subheadline.bold())
+            .foregroundStyle(Theme.ink)
+            .frame(minHeight: 44)
+            .padding(.horizontal, Theme.Space.s4)
+            .background(Theme.lime, in: Capsule())
+        let secondaryButton = Button(secondaryTitle, action: secondaryAction)
+            .font(.subheadline.bold())
+            .foregroundStyle(Theme.lime)
+            .frame(minHeight: 44)
+
+        return VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            Text(title).font(.headline).foregroundStyle(Theme.onGreen)
+            Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
+            if let hint {
+                Text(hint).font(.footnote).foregroundStyle(Theme.onGreen.opacity(0.7))
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Space.s3) {
+                    primaryButton
+                    secondaryButton
+                }
+            } else {
+                HStack(spacing: Theme.Space.s3) {
+                    primaryButton
+                    secondaryButton
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Space.s4)

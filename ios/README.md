@@ -86,3 +86,10 @@ tab opens the camera and looks up a real barcode against the backend end-to-end 
   "Try another scan", Open Settings) using the exact copy in `docs/COPY_DECK.md`.
 - **Secrets stay out of the bundle's source:** Supabase config comes from a gitignored
   xcconfig, not hardcoded Swift.
+
+## Development device & Xcode disk space
+
+- **Develop on a physical iPhone.** The scanner uses VisionKit `DataScannerViewController`, which is **not supported in the Simulator** (and the Simulator has no camera). The scan/OCR/haptics flows can only be tested on a real device.
+- **Keep at most one Simulator runtime** — only needed for SwiftUI Previews (this project has several `#Preview` blocks). Building/running on your iPhone needs none.
+- **Reclaim space:** run `bash tools/xcode-cleanup.sh` (clears regenerable caches; reports the big one-time wins — extra simulator runtimes, old iOS DeviceSupport, archives). Use `--dry` to report only.
+- **Never delete:** Xcode.app, Command Line Tools, or the iOS SDK — those compile the app.
