@@ -30,11 +30,12 @@ Every competitor (Yuka, Ivy, Oasis, Cal AI) shares two fixable wounds: users **d
 - Superseded: the React Native / Expo recommendation and the smooth-app fork option (Flutter) in `reference/build/Master_Build_Plan.docx`.
 
 ## Current status
-Pre-build / Phase 0 (foundation & setup). No code yet. Research, UX, design system, specs, and build plans are complete and live in this repo. Stack decided: native iOS Swift.
+**Building — MVP + Phase-3 depth are live on a physical iPhone; backend deployed to Supabase.** App name: **SafeSide**. See `STATE.md` for the authoritative current status + how to resume. (This line supersedes the earlier "no code yet.")
 
 ## Where things live
-- `DESIGN.md` — UI direction summary · `docs/DESIGN_SYSTEM.md` — full tokens/components + brand kit
-- `MEMORY.md` — decisions log
+- **`STATE.md` — resume brief, READ FIRST: current status, build/run/deploy, secrets, gotchas, next steps.**
+- `DESIGN.md` — UI direction summary · `docs/DESIGN_SYSTEM.md` — original tokens/brand · **`docs/DESIGN_SYSTEM_V3.md` — the LIVE design system (light-first; supersedes v2 visuals)**
+- `MEMORY.md` — decisions log (newest at top)
 - `docs/` — brief, product requirements, design decisions, and specs (scoring, data model, backend, data sources/APIs, ingredient-AI, API, copy deck, metrics, test plan) · `docs/NATIVE_IOS_STACK.md` — the decided native iOS stack · `docs/DATA_SOURCES.md` — open APIs (OFF, USDA, Open*Facts family)
 - `reference/research/` — market + UX research · `reference/build/` — build & phase plans
 - `reference/competitors/`, `reference/flows/`, `reference/screenshots/`, `reference/moodboards/` — supporting notes & visual references

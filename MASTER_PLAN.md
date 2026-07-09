@@ -8,11 +8,11 @@
 
 ---
 
-## Current state & next action (June 2026)
-- **Planning:** complete. Research, specs (scoring, data model, backend, ingredient-AI, API, test), design system + brand, copy deck, native stack — all done.
-- **Scoring:** calibrated on 50 products (`docs/Scoring_Calibration.xlsx`); edge cases pass. Inputs representative until a live OFF pull (`tools/off_live.py`).
-- **Code:** Phase 0 SwiftUI scaffold exists in `ios/FoodScanner/` (not yet an Xcode project).
-- **Next action:** create the Xcode project from the scaffold **and** build the backend `GET /product/:barcode` (lookup → cache → score) so one real scan returns a scored product end-to-end. Run cheap Phase-1 validation in parallel. **Stop writing strategy docs.**
+## Current state & next action (July 2026)
+> **See `STATE.md` for the authoritative resume brief** (status, build/run/deploy, secrets, gotchas, next steps). Short version:
+- **Built & running on a physical iPhone:** the full MVP loop + Phase-3 depth — scan → deterministic sourced score + tri-metric + "why" + AI ingredient explanations + grounded AI chat; guest auth, onboarding, Home, AVFoundation scanner (real zoom/torch/gallery/OCR/shatter), pantry, favorites, allergen alerts, Me/Plan tabs, app icon. App name **SafeSide**.
+- **Backend deployed** to Supabase `usmdthxnxzdywtjgbokl`: scoring engine (`score_version 1.1.0`, calibrated on 50), 174-entry ingredient KB, OFF + USDA, endpoints `/product/:barcode`, `/product/ocr`, `/product/:id/ingredients`, `/chat`. 121 Deno tests. Design system **v3** (light-first) applied across all screens.
+- **Next action:** Section A — real "See a better option" swaps engine · wire report-issue endpoint · analytics events. Then B (data/correctness), C (robustness/a11y), D (legal/tests/branding). Phase D (Apple sign-in + RevenueCat) is LAST. Rotate the dev API keys.
 
 ---
 
