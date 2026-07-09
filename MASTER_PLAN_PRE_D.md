@@ -84,10 +84,22 @@ Per `docs/AI_PLANNER_SPEC.md` + user-flows §4–5: weekly grid, add-from-pantry
 - 5 after meters exist (1) — compare reuses the meter component.
 - 6 sweeps everything after feature churn stops; 7 last because analytics wants final event names.
 
+## Skills toolchain (use these, every chunk)
+
+| Skill | When | How |
+|---|---|---|
+| **`ui-ux-pro-max`** (installed `~/.claude/skills/ui-ux-pro-max`) | Design + build + review of every UI chunk | Query the DB before building: `python3 ~/.claude/skills/ui-ux-pro-max/scripts/search.py "<topic>" --stack swiftui` (SwiftUI do/don't rules) and `--domain ux` (99 UX guidelines). Run its **Pre-Delivery Checklist** (App UI section: icons, interaction, light/dark contrast, layout, a11y) as a merge gate alongside our teardown AVOID list. ⚠️ **Never adopt its palette/font suggestions** — brand is locked to DESIGN_SYSTEM_V3 (mint canvas, bold green, Space Grotesk); use it for rules, stack guidance, and checklists only. |
+| **`/ux-writing`** | All new user-facing copy (Chunks 1, 2, 3, 5, 7) | Patterns: errors = `[what failed]. [why]. [what to do]`, 8–14-word sentences, verbs first, no blame, no dead-ends, no "Something went wrong". New-surface copy already drafted in `docs/COPY_DECK.md` §New surfaces — implement those strings verbatim; any *new* string goes through the skill's 4-phase edit (purposeful → concise → conversational → clear) and into the deck. |
+| **`/ios-design-review`** | End of every UI chunk | Screen-level review on the sim screenshots before device install. |
+| **`/accessibility-audit`** + **`/frontend-a11y`** | Chunk 6 sweep (and spot-checks per chunk) | Structured WCAG 2.1 AA pass; complements the manual VoiceOver walk. |
+| **`/design-review` / `/ux-audit`** | Chunk 6 + pre-Phase-D exit | Full-app audit against DESIGN.md laws + teardown AVOID list. |
+| **`superpowers:writing-plans`** | Start of every chunk | Detailed TDD implementation plan per chunk (already standing process). |
+
 ## Standing rules (every chunk)
 - UI/UX never compromised (founder directive) — matrix screenshots before device, device review before merge-to-main.
 - Principles gate: transparency, ED-safe, honest states, never-a-dead-end, LLM-never-does-math, AA a11y.
-- Teardown AVOID list (`design-teardown.md`) is a blocking review checklist.
+- Teardown AVOID list (`design-teardown.md`) + ui-ux-pro-max Pre-Delivery Checklist are blocking review gates.
+- All new copy from `docs/COPY_DECK.md` §New surfaces (drafted via /ux-writing); new strings go through the deck, never invented inline.
 - Keys stay out of repo; **rotate the pasted Cerebras/Groq/USDA keys + Supabase access token before Chunk 7 analytics work** (STATE.md warning stands).
 - Each chunk: MEMORY.md decision entry + STATE.md status line update on completion.
 

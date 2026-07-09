@@ -1,6 +1,6 @@
 # UX Copy Deck
 
-**Version:** 1.0 (draft for build) · June 2026
+**Version:** 1.1 · July 2026 (v1.1 adds the pre-Phase-D surfaces — see §New surfaces; written to the ux-writing patterns: `[what happened]. [why]. [what to do]`, 8–14-word sentences, verbs first, no blame, no dead-ends)
 **Voice:** clear, calm, neutral, supportive. Describe — never judge. See `DESIGN.md` §Voice and the UX Research doc §9. Banned words: bad, toxic, poison, junk, clean, cheat, "you went over".
 
 ---
@@ -81,15 +81,78 @@
 - Methodology: "How we score" → links to the plain-language methodology page.
 - Disclaimer (footer): "Information only — not medical advice. Allergen data may be incomplete; check labels."
 
-## Errors (what happened + how to fix)
+## Errors (what happened + how to fix — never "Something went wrong")
 - Network: "You're offline. We'll show saved results; reconnect to scan new items."
-- Generic: "Something went wrong. Try again." [Retry]
+- Lookup fail: "Couldn't reach the product database. Check your connection and try again." [Retry]
+- Load fail (section): "Couldn't load {section}. Tap to retry." [Retry]
 - AI fail: "Couldn't generate a plan right now. You can build one manually." 
 
 ## Success (quietly affirming, never over the top)
 - Plan saved: "Plan saved."
 - List ready: "Your list's ready."
 - First scan: "Nice — your first scan's in your pantry."
+
+---
+
+## New surfaces (v1.1 — pre-Phase-D chunks; MASTER_PLAN_PRE_D)
+
+### Result upgrades (Chunk 1)
+- Meters section headers: "Watch-outs" · "Benefits" (never "Negatives/Positives" — softer, still honest)
+- Meter row pattern: "{Nutrient} {value}{unit} — {tier word}" e.g. "Saturated fat 26.7 g — high" · "Fiber 4.5 g — good source"
+- Counts pre-read: "{n} ingredients to know about · {n} beneficial"
+- Confidence caveat (estimated): "Estimated — {field} isn't on the label." 
+- Confidence caveat (OCR): "Scored from a label photo. Some details may be missing."
+- Source row pattern: "{Source name} · updated {date}"
+- Report issue row: "Report an issue"
+- Report sheet title: "What looks wrong?"
+- Report reasons: "Score seems off" · "Wrong product info" · "Missing ingredient" · "Something else"
+- Report free-text label: "Tell us more (optional)"
+- Report submit: "Send report" → Success: "Thanks — we'll review it."
+- Report error: "Couldn't send your report. Check your connection and try again." [Retry]
+
+### Search & manual barcode (Chunk 2)
+- Home field placeholder: "Search any product…"
+- Search screen title: "Search"
+- Barcode toggle: "Enter a barcode"
+- Barcode field label: "Barcode number"
+- Default state header: "Recent scans"
+- Searching: "Searching Open Food Facts…"
+- No results: "No matches for '{query}'. Try the barcode, or snap the label." [Scan instead]
+- Search error: "Search isn't available right now. Check your connection and try again." [Retry]
+- Scan-banner manual entry: "Enter barcode manually"
+
+### Swaps (Chunk 3 — replaces the stub tip)
+- Sheet title: "Better options in {category}"
+- Loading: "Finding better options…"
+- Delta chip: "+{n} score"
+- Why-better line pattern (sourced facts only): "No {additive} · lower {nutrient}" e.g. "No colours E150d · lower saturated fat"
+- Card actions: "View" · "Save to pantry"
+- Pantry-match chip: "In your pantry"
+- Empty (honest): "Few close matches in this category yet. Here's the nearest — or scan another to compare." [Scan another]
+- Restriction note: "Filtered for your allergies." (shown when profile filters applied)
+
+### Compare (Chunk 5)
+- Entry action: "Compare"
+- Screen title: "Compare"
+- Winner tint label (a11y): "{Product} scores higher on {metric}"
+- CTA: "Pick this one" → "Saved to pantry."
+- Compact toggle labels: product names (truncate at 18 chars + ellipsis)
+
+### Offline & limits (Chunks 4/6)
+- Offline scan attempt: "You're offline. Scanning needs a connection — your pantry still works."
+- Offline result partial: "Showing saved details. Reconnect for the latest."
+- Chat rate-limit (429): "You've asked a lot in a short time. Give it a minute and try again."
+- Chat offline: "Chat needs a connection. Your product details are still here."
+
+### Feedback gate (Chunk 7 — after 3rd successful scan, never onboarding)
+- Prompt: "How's SafeSide so far?" — options: "Not great" · "Okay" · "Good" · "Great"
+- Not great/Okay → "What should we fix?" [free text] → "Thanks — this goes straight to the team."
+- Good/Great → "Glad it helps. Mind rating us on the App Store?" [Rate SafeSide] [Not now]
+
+### Legal & attribution (Chunk 7)
+- Me rows: "Privacy policy" · "Terms of use" · "Data sources & attribution"
+- Attribution intro: "Product data comes from Open Food Facts, available under the Open Database License (ODbL)."
+- USDA line: "Nutrition enrichment from USDA FoodData Central (public domain)."
 
 ---
 
