@@ -17,3 +17,6 @@ ios/Config.xcconfig
 # literal "$(SUPABASE_URL)" macro is substituted by Xcode at build time — but
 # it's a build artifact, not authored source).
 ios/Generated/
+
+# Claude Code session/memory scratch (not app source)
+.claude/projects/

@@ -57,7 +57,7 @@ targets:
     info:
       path: Generated/FoodScanner-Info.plist
       properties:
-        CFBundleDisplayName: FoodScanner
+        CFBundleDisplayName: SafeSide
         NSCameraUsageDescription: "Scan product barcodes and labels to look up ingredients."
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
