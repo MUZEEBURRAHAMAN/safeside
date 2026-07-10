@@ -32,7 +32,7 @@ final class ProfileService {
             profile = rows.first
             loadError = nil
         } catch {
-            loadError = "Something went wrong. Try again."
+            loadError = "Couldn't load your profile. Check your connection and try again."
         }
     }
 
@@ -57,7 +57,7 @@ final class ProfileService {
             loadError = nil
             return true
         } catch {
-            loadError = "Something went wrong. Try again."
+            loadError = "Couldn't save your answers. Check your connection and try again."
             return false
         }
     }
@@ -94,7 +94,7 @@ final class ProfileService {
             loadError = nil
             return true
         } catch {
-            loadError = "Something went wrong. Try again."
+            loadError = "Couldn't save that change. Check your connection and try again."
             return false
         }
     }

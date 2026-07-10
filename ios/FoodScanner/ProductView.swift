@@ -240,7 +240,7 @@ struct ProductView: View {
             Task { await pantryService.toggleFavorite(productID: workingProduct.id) }
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(Theme.greenDeep)
                 .frame(width: 44, height: 44)
         }

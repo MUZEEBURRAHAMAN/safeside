@@ -12,6 +12,8 @@ struct MeView: View {
     @Environment(ProfileService.self) private var profileService
 
     @State private var activeSheet: MeSheet?
+    @ScaledMetric(relativeTo: .subheadline) private var avatarCircle: CGFloat = 40
+    @ScaledMetric(relativeTo: .subheadline) private var avatarGlyph: CGFloat = 16
 
     private var profile: Profile? { profileService.profile }
 
@@ -21,12 +23,13 @@ struct MeView: View {
                 VStack(alignment: .leading, spacing: Theme.Space.s6) {
                     header
                     guestSection
+                    profileLoadErrorRow
                     profileSection
                     settingsSection
                     aboutSection
                     dataControlsSection
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Theme.Space.s45)
                 .padding(.top, Theme.Space.s4)
                 .padding(.bottom, Theme.Space.s7)   // clear the tab bar
             }
@@ -59,6 +62,31 @@ struct MeView: View {
         }
     }
 
+    /// Quiet inline retry when the profile failed to load AND there's nothing
+    /// to show — previously a failed load rendered silently as "Not set"
+    /// defaults with no affordance (SCREEN_SPECS §12 fix). Hidden as soon as
+    /// any profile data exists; the rows below stay usable either way.
+    @ViewBuilder
+    private var profileLoadErrorRow: some View {
+        if let error = profileService.loadError, profile == nil {
+            HStack(spacing: Theme.Space.s3) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                Text(error)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Theme.Space.s2)
+                Button("Try again") { Task { await profileService.load() } }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.greenDeep)
+            }
+            .surfaceCard()
+            .accessibilityElement(children: .combine)
+        }
+    }
+
     // MARK: - Guest / identity
 
     /// Guest-first (SessionService starts `.anonymous` and stays that way
@@ -71,9 +99,9 @@ struct MeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: Theme.Space.s3) {
                     ZStack {
-                        Circle().fill(Theme.greenSoft).frame(width: 40, height: 40)
+                        Circle().fill(Theme.greenSoft).frame(width: avatarCircle, height: avatarCircle)
                         Image(systemName: "person.fill")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: avatarGlyph, weight: .semibold))
                             .foregroundStyle(Theme.greenDeep)
                     }
                     .accessibilityHidden(true)

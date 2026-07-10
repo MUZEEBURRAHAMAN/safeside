@@ -48,7 +48,7 @@ struct OnboardingView: View {
             switch self {
             case .goal: return "A few quick questions so suggestions fit you. Skip anything you like."
             case .diet: return "Optional — helps match suggestions to how you eat."
-            case .allergies: return "Optional — we'll flag these clearly on scanned products."
+            case .allergies: return "Optional — we'll flag these clearly on scanned products. Change anytime in Me."
             case .household: return "Optional — helps size suggestions to your household."
             case .cookTime: return "Optional — matches suggestions to your schedule."
             case .dislikes: return "Optional — foods you'd rather not see suggested."
@@ -164,6 +164,13 @@ struct OnboardingView: View {
                 }
 
                 caloriesToggleCard
+
+                // Final-step closer (SCREEN_SPECS §1): everything remains
+                // editable — closes the flow without a dead-end feeling.
+                Text("You can change all of this anytime in the Me tab.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -389,6 +396,10 @@ private struct OptionCard: View {
     let icon: String?
     let isSelected: Bool
     let action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var iconCircle: CGFloat = 40
+    @ScaledMetric(relativeTo: .body) private var iconGlyph: CGFloat = 17
+    @ScaledMetric(relativeTo: .caption) private var checkDisc: CGFloat = 24
+    @ScaledMetric(relativeTo: .caption) private var checkGlyph: CGFloat = 12
 
     var body: some View {
         Button(action: action) {
@@ -397,9 +408,9 @@ private struct OptionCard: View {
                     ZStack {
                         Circle()
                             .fill(isSelected ? Theme.greenDeep : Theme.surfaceAlt)
-                            .frame(width: 40, height: 40)
+                            .frame(width: iconCircle, height: iconCircle)
                         Image(systemName: icon)
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: iconGlyph, weight: .semibold))
                             .foregroundStyle(isSelected ? Theme.onGreen : Theme.textSecondary)
                     }
                     .accessibilityHidden(true)
@@ -420,11 +431,11 @@ private struct OptionCard: View {
                         .strokeBorder(isSelected ? Color.clear : Theme.border, lineWidth: 1.5)
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: checkGlyph, weight: .bold))
                             .foregroundStyle(Theme.onGreen)
                     }
                 }
-                .frame(width: 24, height: 24)
+                .frame(width: checkDisc, height: checkDisc)
                 .accessibilityHidden(true)
             }
             .padding(Theme.Space.s4)

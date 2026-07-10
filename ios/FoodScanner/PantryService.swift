@@ -108,7 +108,7 @@ final class PantryService {
             loadError = nil
         } catch {
             // Calm, actionable copy (docs/COPY_DECK.md) — never surface the raw error.
-            loadError = "Something went wrong. Try again."
+            loadError = "Couldn't load your pantry. Check your connection and try again."
         }
     }
 
@@ -185,7 +185,7 @@ final class PantryService {
             }
             trendingError = nil
         } catch {
-            trendingError = "Something went wrong. Try again."
+            trendingError = "Couldn't load trending products right now."
         }
     }
 
@@ -243,6 +243,32 @@ final class PantryService {
     /// (e.g. to pick a filled vs. outline heart) without awaiting anything.
     func isFavorite(_ productID: String) -> Bool {
         favoriteProductIDs.contains(productID)
+    }
+
+    /// Removes a product from the pantry entirely (user-control gap fix,
+    /// SCREEN_SPECS §8 — there was previously no way to remove an item).
+    /// Optimistic: drops the local entry immediately so the grid responds;
+    /// on failure restores the backed-up state so the UI never lies.
+    @MainActor
+    func remove(productID: String) async {
+        guard session.isBackendReachable, let client = session.supabaseClient,
+              !session.userID.isEmpty else { return }
+        let entriesBackup = entries
+        let favoritesBackup = favoriteProductIDs
+        entries.removeAll { $0.product.id == productID }
+        favoriteProductIDs.remove(productID)
+
+        do {
+            try await client
+                .from("pantry_items")
+                .delete()
+                .eq("user_id", value: session.userID)
+                .eq("product_id", value: productID)
+                .execute()
+        } catch {
+            entries = entriesBackup
+            favoriteProductIDs = favoritesBackup
+        }
     }
 
     /// Insert-or-touch a `pantry_items` row on the unique `(user_id,

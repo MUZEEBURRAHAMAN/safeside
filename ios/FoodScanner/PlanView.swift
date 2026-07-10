@@ -6,6 +6,9 @@ import SwiftUI
 /// never a fake progress indicator or feature that isn't real (CLAUDE.md:
 /// honest, no dark patterns).
 struct PlanView: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var iconCircle: CGFloat = 88
+    @ScaledMetric(relativeTo: .largeTitle) private var iconGlyph: CGFloat = 34
+
     var body: some View {
         NavigationStack {
             VStack(spacing: Theme.Space.s5) {
@@ -14,9 +17,9 @@ struct PlanView: View {
                 ZStack {
                     Circle()
                         .fill(Theme.greenSoft)
-                        .frame(width: 88, height: 88)
+                        .frame(width: iconCircle, height: iconCircle)
                     Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 34, weight: .semibold))
+                        .font(.system(size: iconGlyph, weight: .semibold))
                         .foregroundStyle(Theme.greenDeep)
                 }
                 .accessibilityHidden(true)
@@ -38,7 +41,7 @@ struct PlanView: View {
                 Spacer(minLength: 0)
                 Spacer(minLength: 0)   // biases content slightly above center
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, Theme.Space.s6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.canvas)
             .toolbar(.hidden, for: .navigationBar)

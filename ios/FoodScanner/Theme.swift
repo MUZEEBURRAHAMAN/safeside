@@ -31,7 +31,8 @@ enum Theme {
 
     // Spacing (4-pt grid)
     enum Space { static let s1: CGFloat = 4, s2: CGFloat = 8, s3: CGFloat = 12,
-                 s4: CGFloat = 16, s5: CGFloat = 24, s6: CGFloat = 32, s7: CGFloat = 48 }
+                 s4: CGFloat = 16, s45: CGFloat = 20, s5: CGFloat = 24,
+                 s6: CGFloat = 32, s7: CGFloat = 48 }
     // v3 §4 — larger radii; primary buttons use `full` (pill).
     enum Radius { static let sm: CGFloat = 12, md: CGFloat = 20, lg: CGFloat = 28,
                   full: CGFloat = 999 }

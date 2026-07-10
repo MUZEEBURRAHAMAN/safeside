@@ -13,6 +13,9 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showScanner = false
     @State private var pantryFilter: PantryFilter = .recent
+    @State private var pantrySort: PantrySort = .recent
+    /// Product pending a remove confirmation (context menu → dialog).
+    @State private var pendingRemoval: Product?
 
     private enum PantryFilter: String, CaseIterable, Identifiable {
         case recent, favorites
@@ -25,13 +28,40 @@ struct HomeView: View {
         }
     }
 
-    /// `entries` filtered for display — filtering (not re-fetching) keeps
-    /// favoriting instant, since `PantryService.favoriteProductIDs` is
-    /// already the live, fast-lookup source of truth.
+    private enum PantrySort: String, CaseIterable, Identifiable {
+        case recent, scoreHighFirst
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .recent: return "Most recent"
+            case .scoreHighFirst: return "Highest score"
+            }
+        }
+    }
+
+    /// `entries` filtered + sorted for display — filtering (not re-fetching)
+    /// keeps favoriting instant, since `PantryService.favoriteProductIDs` is
+    /// already the live, fast-lookup source of truth. Sort is view-local:
+    /// the server order is last-seen desc (the `.recent` case); score sort
+    /// is a stable client-side reorder of that same list.
     private var filteredEntries: [PantryEntry] {
+        let filtered: [PantryEntry]
         switch pantryFilter {
-        case .recent: return pantryService.entries
-        case .favorites: return pantryService.entries.filter { pantryService.isFavorite($0.product.id) }
+        case .recent: filtered = pantryService.entries
+        case .favorites: filtered = pantryService.entries.filter { pantryService.isFavorite($0.product.id) }
+        }
+        switch pantrySort {
+        case .recent:
+            return filtered
+        case .scoreHighFirst:
+            // Stable: equal/missing scores keep their last-seen order.
+            return filtered.enumerated()
+                .sorted { lhs, rhs in
+                    let l = lhs.element.score?.score ?? -1
+                    let r = rhs.element.score?.score ?? -1
+                    return l != r ? l > r : lhs.offset < rhs.offset
+                }
+                .map(\.element)
         }
     }
 
@@ -84,7 +114,7 @@ struct HomeView: View {
                         trendingContent
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Theme.Space.s45)
                 .padding(.top, Theme.Space.s4)
                 .padding(.bottom, Theme.Space.s7)   // clear the tab bar
             }
@@ -155,8 +185,33 @@ struct HomeView: View {
                         pantryFilter = filter
                     }
                 }
+
+                Spacer(minLength: 0)
+
+                sortMenu
             }
         }
+    }
+
+    /// Small, quiet sort control on the chips row — a system `Menu` (native
+    /// affordance per DESIGN.md "defer to the platform"), never competing
+    /// with the primary chips.
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort pantry", selection: $pantrySort) {
+                ForEach(PantrySort.allCases) { sort in
+                    Text(sort.label).tag(sort)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Sort pantry")
+        .accessibilityValue(pantrySort.label)
     }
 
     @ViewBuilder
@@ -179,8 +234,33 @@ struct HomeView: View {
         } else {
             LazyVGrid(columns: gridColumns, spacing: Theme.Space.s4) {
                 ForEach(filteredEntries) { entry in
+                    // Context menu (grid = no swipe rows) + confirm before the
+                    // destructive delete — pantry cards only, never trending.
                     ProductCard(product: entry.asProduct())
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                pendingRemoval = entry.asProduct()
+                            } label: {
+                                Label("Remove from pantry", systemImage: "trash")
+                            }
+                        }
                 }
+            }
+            .confirmationDialog(
+                "Remove \(pendingRemoval?.name ?? "this product") from your pantry?",
+                isPresented: Binding(
+                    get: { pendingRemoval != nil },
+                    set: { if !$0 { pendingRemoval = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove", role: .destructive) {
+                    if let product = pendingRemoval {
+                        Task { await pantryService.remove(productID: product.id) }
+                    }
+                    pendingRemoval = nil
+                }
+                Button("Keep", role: .cancel) { pendingRemoval = nil }
             }
         }
     }
@@ -240,14 +320,17 @@ private struct CardPressButtonStyle: ButtonStyle {
 /// spoken label + hint instead.
 private struct ScanCTACard: View {
     let action: () -> Void
+    // Glyph + its circle scale together with Dynamic Type (DESIGN.md §3.2).
+    @ScaledMetric(relativeTo: .title3) private var iconCircle: CGFloat = 56
+    @ScaledMetric(relativeTo: .title3) private var iconGlyph: CGFloat = 26
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.s4) {
                 ZStack {
-                    Circle().fill(Theme.onGreen.opacity(0.18)).frame(width: 56, height: 56)
+                    Circle().fill(Theme.onGreen.opacity(0.18)).frame(width: iconCircle, height: iconCircle)
                     Image(systemName: "barcode.viewfinder")
-                        .font(.system(size: 26, weight: .semibold))
+                        .font(.system(size: iconGlyph, weight: .semibold))
                         .foregroundStyle(Theme.onGreen)
                 }
 
@@ -284,13 +367,15 @@ private struct ScanCTACard: View {
 /// omits it entirely (no empty card) when there's no pantry data yet.
 private struct DailyInsightTile: View {
     let text: String
+    @ScaledMetric(relativeTo: .subheadline) private var iconCircle: CGFloat = 40
+    @ScaledMetric(relativeTo: .subheadline) private var iconGlyph: CGFloat = 15
 
     var body: some View {
         HStack(spacing: Theme.Space.s3) {
             ZStack {
-                Circle().fill(Theme.greenSoft).frame(width: 40, height: 40)
+                Circle().fill(Theme.greenSoft).frame(width: iconCircle, height: iconCircle)
                 Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: iconGlyph, weight: .semibold))
                     .foregroundStyle(Theme.greenDeep)
             }
             .accessibilityHidden(true)
@@ -354,17 +439,19 @@ private struct GradeDot: View {
     let score: Int?
     let band: ScoreBand
     var diameter: CGFloat = 28
+    // One shared factor scales disc + number together with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption) private var scale: CGFloat = 1
 
     var body: some View {
         ZStack {
-            Circle().fill(bandColor(band)).frame(width: diameter, height: diameter)
+            Circle().fill(bandColor(band)).frame(width: diameter * scale, height: diameter * scale)
             Text(score.map(String.init) ?? "—")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
         }
-        .frame(width: diameter, height: diameter)
+        .frame(width: diameter * scale, height: diameter * scale)
         .accessibilityHidden(true)
     }
 }
@@ -480,6 +567,8 @@ private struct ProductCard: View {
 private struct FavoriteHeartInline: View {
     @Environment(PantryService.self) private var pantryService
     let productID: String
+    @ScaledMetric(relativeTo: .subheadline) private var visualCircle: CGFloat = 32
+    @ScaledMetric(relativeTo: .subheadline) private var glyph: CGFloat = 15
 
     private var isFavorite: Bool { pantryService.isFavorite(productID) }
 
@@ -488,13 +577,13 @@ private struct FavoriteHeartInline: View {
             Task { await pantryService.toggleFavorite(productID: productID) }
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: glyph, weight: .semibold))
                 .foregroundStyle(isFavorite ? Theme.greenDeep : Theme.textSecondary)
-                .frame(width: 32, height: 32)
+                .frame(width: visualCircle, height: visualCircle)
                 .background(Theme.surface.opacity(0.92), in: Circle())
                 .overlay(Circle().strokeBorder(Theme.border, lineWidth: 1))
         }
-        .frame(width: 44, height: 44)
+        .frame(width: max(44, visualCircle), height: max(44, visualCircle))
         .contentShape(Circle())
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
         .accessibilityAddTraits(isFavorite ? [.isSelected] : [])
