@@ -119,9 +119,12 @@
 - Barcode toggle: "Enter a barcode"
 - Barcode field label: "Barcode number"
 - Default state header: "Recent scans"
+- Empty recents (new user, no scans): "No recent scans yet. Search a product name, or enter a barcode." [Scan instead]
 - Searching: "Searching Open Food Facts…"
 - No results: "No matches for '{query}'. Try the barcode, or snap the label." [Scan instead]
 - Search error: "Search isn't available right now. Check your connection and try again." [Retry]
+- Loader not-found (searched/typed barcode not in Open Food Facts): "We don't have this one yet. Snap the ingredients label and we'll score it." [Scan instead]
+- Unscored row caption (we have no current-version score for it): "Not scored yet"
 - Scan-banner manual entry: "Enter barcode manually"
 
 ### Swaps (Chunk 3 — replaces the stub tip)

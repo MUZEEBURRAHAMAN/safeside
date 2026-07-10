@@ -5,8 +5,11 @@
 
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  fetchOffSearch,
   fetchProduct,
+  mapOffFields,
   mapOffPayload,
+  mapOffSearchPayload,
   OFF_USER_AGENT,
 } from "./off.ts";
 
@@ -170,6 +173,124 @@ Deno.test("fetchProduct throws on server errors (caller maps to 502)", async () 
   let threw = false;
   try {
     await fetchProduct("3017620422003", fakeFetch);
+  } catch {
+    threw = true;
+  }
+  assertEquals(threw, true);
+});
+
+// ---------------------------------------------------------------------------
+// Shared per-product mapper + search (Chunk 2)
+// ---------------------------------------------------------------------------
+
+Deno.test("mapOffFields maps a raw product + explicit code to the internal shape", () => {
+  const mapped = mapOffFields(NUTELLA_FIXTURE.product, NUTELLA_FIXTURE.code);
+  assertEquals(mapped.barcode, "3017620422003");
+  assertEquals(mapped.name, "Nutella");
+  assertEquals(mapped.brand, "Ferrero");
+  assertEquals(mapped.novaGroup, 4);
+  assertEquals(mapped.nutriscoreGrade, "e");
+  assertEquals(mapped.additivesTags, ["en:e322", "en:e471"]);
+  assertEquals(mapped.allergensTags, ["en:milk", "en:nuts", "en:soybeans"]);
+  assertEquals(
+    mapped.imageUrl,
+    "https://images.openfoodfacts.org/images/products/301/762/042/2003/front_en.jpg",
+  );
+  assertEquals(mapped.nutriments["sugars_100g"], 56.3);
+});
+
+Deno.test("mapOffSearchPayload maps a products[] array to OffProducts", () => {
+  const payload = {
+    count: 2,
+    products: [
+      { code: "3017620422003", product_name: "Nutella", brands: "Ferrero" },
+      { code: "0000000000001", product_name: "Store Oats" },
+    ],
+  };
+  const mapped = mapOffSearchPayload(payload);
+  assertEquals(mapped.length, 2);
+  assertEquals(mapped[0].barcode, "3017620422003");
+  assertEquals(mapped[0].name, "Nutella");
+  assertEquals(mapped[1].barcode, "0000000000001");
+  assertEquals(mapped[1].name, "Store Oats");
+});
+
+Deno.test("mapOffSearchPayload drops items with a missing/blank code", () => {
+  const payload = {
+    products: [
+      { code: "3017620422003", product_name: "Nutella" },
+      { code: "", product_name: "No barcode" },
+      { product_name: "Missing code entirely" },
+    ],
+  };
+  const mapped = mapOffSearchPayload(payload);
+  assertEquals(mapped.length, 1);
+  assertEquals(mapped[0].barcode, "3017620422003");
+});
+
+Deno.test("mapOffSearchPayload returns [] for empty/malformed bodies", () => {
+  assertEquals(mapOffSearchPayload({ products: [] }), []);
+  assertEquals(mapOffSearchPayload({}), []);
+  assertEquals(mapOffSearchPayload(null), []);
+  assertEquals(mapOffSearchPayload({ products: "nope" }), []);
+});
+
+Deno.test("fetchOffSearch builds the v2 search URL and returns mapped results", async () => {
+  let capturedUrl = "";
+  let capturedUserAgent: string | null = null;
+
+  const fakeFetch = (
+    input: URL | RequestInfo,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    capturedUrl = String(input);
+    capturedUserAgent = new Headers(init?.headers).get("User-Agent");
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          count: 1,
+          products: [
+            { code: "3017620422003", product_name: "Nutella", brands: "Ferrero" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  };
+
+  const results = await fetchOffSearch("nutella", fakeFetch);
+  assertEquals(results.length, 1);
+  assertEquals(results[0].name, "Nutella");
+  assertEquals(capturedUserAgent, OFF_USER_AGENT);
+  assertStringIncludes(
+    capturedUrl,
+    "https://world.openfoodfacts.org/api/v2/search",
+  );
+  assertStringIncludes(capturedUrl, "search_terms=nutella");
+  assertStringIncludes(capturedUrl, "fields=");
+  assertStringIncludes(capturedUrl, "code");
+  assertStringIncludes(capturedUrl, "page_size=20");
+  assertStringIncludes(capturedUrl, "sort_by=unique_scans_n");
+});
+
+Deno.test("fetchOffSearch percent-encodes the query", async () => {
+  let capturedUrl = "";
+  const fakeFetch = (input: URL | RequestInfo): Promise<Response> => {
+    capturedUrl = String(input);
+    return Promise.resolve(
+      new Response(JSON.stringify({ products: [] }), { status: 200 }),
+    );
+  };
+  await fetchOffSearch("dark chocolate 70%", fakeFetch);
+  assertStringIncludes(capturedUrl, "search_terms=dark%20chocolate%2070%25");
+});
+
+Deno.test("fetchOffSearch throws on non-OK HTTP (caller maps to 502)", async () => {
+  const fakeFetch = (): Promise<Response> =>
+    Promise.resolve(new Response("oops", { status: 500 }));
+  let threw = false;
+  try {
+    await fetchOffSearch("nutella", fakeFetch);
   } catch {
     threw = true;
   }

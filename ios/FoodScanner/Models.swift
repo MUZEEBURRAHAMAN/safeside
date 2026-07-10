@@ -78,6 +78,26 @@ struct ScoreResult: Codable {
     var highlights: NutrientHighlights? = nil
 }
 
+/// One row in the Search results list (`GET /search?q=`). A trimmed product
+/// shell — enough to render a row and route a tap to the identical scored
+/// `/product/:barcode` path a scan uses. `score` is present ONLY when the
+/// backend has OUR cached score at the current `score_version`; a nil `score`
+/// means "not scored by us yet" and the row shows a neutral affordance — we
+/// never surface Open Food Facts' own Nutri-Score as ours (transparency).
+struct SearchResult: Codable, Identifiable {
+    var id: String { barcode }
+    let barcode: String
+    let name: String
+    let brand: String?
+    let imageURL: String?
+    let score: SearchScore?          // nil ⇒ not scored by us yet (neutral dot)
+
+    struct SearchScore: Codable {
+        let score: Int
+        let band: ScoreBand
+    }
+}
+
 struct Ingredient: Codable, Identifiable {
     var id: String { name }
     let name: String

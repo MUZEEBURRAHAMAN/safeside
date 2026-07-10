@@ -11,6 +11,11 @@
 
 const OFF_BASE_URL = "https://world.openfoodfacts.org/api/v2/product";
 
+/** OFF v2 name-search endpoint (Chunk 2). Kept general so Chunk 3 (Swaps)
+ * can reuse the same search/category plumbing. */
+export const OFF_SEARCH_BASE_URL =
+  "https://world.openfoodfacts.org/api/v2/search";
+
 export const OFF_USER_AGENT = "FoodScannerApp/0.1 (dev; muzeeb@omnisai.io)";
 
 /** The only fields we ask OFF for. */
@@ -52,23 +57,16 @@ function asNonEmptyString(value: unknown): string | null {
 }
 
 /**
- * Map an OFF v2 response body to our internal shape.
- * Returns null when the product is not in OFF (status 0).
+ * Map a single raw OFF product object + its explicit barcode to our internal
+ * shape. The one place the OFF field mapping lives — shared by the by-barcode
+ * `mapOffPayload` and the name-search `mapOffSearchPayload` so both stay in
+ * lockstep. `raw` preserves the source object for re-derivation.
  * Exported separately so it is unit-testable without any network.
  */
-export function mapOffPayload(payload: unknown): OffProduct | null {
-  const body = payload as {
-    status?: number;
-    code?: string;
-    product?: Record<string, unknown>;
-  } | null;
-
-  if (!body || body.status === 0 || !body.product) {
-    return null;
-  }
-
-  const p = body.product;
-
+export function mapOffFields(
+  p: Record<string, unknown>,
+  code: string,
+): OffProduct {
   // nova_group: number 1–4, sometimes a numeric string, often absent.
   let novaGroup: number | null = null;
   const rawNova = p.nova_group;
@@ -87,7 +85,7 @@ export function mapOffPayload(payload: unknown): OffProduct | null {
   }
 
   return {
-    barcode: asNonEmptyString(body.code) ?? "",
+    barcode: asNonEmptyString(code) ?? "",
     name: asNonEmptyString(p.product_name) ?? "Unknown product",
     brand: asNonEmptyString(p.brands),
     novaGroup,
@@ -105,8 +103,52 @@ export function mapOffPayload(payload: unknown): OffProduct | null {
       p.nutriments && typeof p.nutriments === "object"
         ? (p.nutriments as Record<string, unknown>)
         : {},
-    raw: payload,
+    raw: p,
   };
+}
+
+/**
+ * Map an OFF v2 by-barcode response body to our internal shape.
+ * Returns null when the product is not in OFF (status 0).
+ * Exported separately so it is unit-testable without any network.
+ */
+export function mapOffPayload(payload: unknown): OffProduct | null {
+  const body = payload as {
+    status?: number;
+    code?: string;
+    product?: Record<string, unknown>;
+  } | null;
+
+  if (!body || body.status === 0 || !body.product) {
+    return null;
+  }
+
+  const mapped = mapOffFields(body.product, asNonEmptyString(body.code) ?? "");
+  // The by-barcode path preserves the FULL response envelope as raw_off
+  // (status/code + product), matching the pre-refactor behavior.
+  return { ...mapped, raw: payload };
+}
+
+/**
+ * Map an OFF v2 SEARCH response body (`{ products: [...], count }`) to our
+ * internal shape. Each item carries its own `code`. Items with a blank/missing
+ * barcode are dropped (a nameless/codeless row is useless). Returns [] for an
+ * empty or malformed body. Kept general (no Search-screen assumptions) so
+ * Chunk 3 (Swaps) can reuse it.
+ */
+export function mapOffSearchPayload(payload: unknown): OffProduct[] {
+  const products = (payload as { products?: unknown } | null)?.products;
+  if (!Array.isArray(products)) return [];
+
+  const out: OffProduct[] = [];
+  for (const item of products) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const code = asNonEmptyString(p.code);
+    if (code === null) continue; // no barcode → useless row
+    out.push(mapOffFields(p, code));
+  }
+  return out;
 }
 
 /**
@@ -138,4 +180,35 @@ export async function fetchProduct(
 
   const payload = await res.json();
   return mapOffPayload(payload);
+}
+
+/**
+ * Name-search OFF v2. Returns the mapped (barcode-carrying) products, sorted
+ * by popularity server-side. Throws on non-OK HTTP so the handler can surface
+ * a 502. `fetchImpl` is injectable for tests. Attaches NO scores — the search
+ * handler joins our own cached scores separately (transparency: we never show
+ * OFF's own Nutri-Score as ours).
+ */
+export async function fetchOffSearch(
+  query: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<OffProduct[]> {
+  // encodeURIComponent (not URLSearchParams, which would encode spaces as "+")
+  // so the query is percent-encoded exactly (matches the plan + fetchProduct).
+  const url = `${OFF_SEARCH_BASE_URL}?search_terms=${
+    encodeURIComponent(query)
+  }&fields=${OFF_FIELDS},code&page_size=20&sort_by=unique_scans_n`;
+
+  const res = await fetchImpl(url, {
+    headers: {
+      "User-Agent": OFF_USER_AGENT,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Open Food Facts search failed: HTTP ${res.status}`);
+  }
+
+  return mapOffSearchPayload(await res.json());
 }

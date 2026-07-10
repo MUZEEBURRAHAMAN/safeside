@@ -96,6 +96,9 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: Theme.Space.s6) {
                     heroHeader
 
+                    NavigationLink { SearchView() } label: { SearchFieldRow() }
+                        .buttonStyle(.plain)
+
                     ScanCTACard { showScanner = true }
 
                     if let dailyInsightText {
@@ -357,6 +360,37 @@ private struct ScanCTACard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Scan a product")
         .accessibilityHint("Opens the scanner to scan a barcode and get a clear, sourced score.")
+    }
+}
+
+// MARK: - Search field row (Home entry point → Search screen)
+
+/// A tappable field-styled row under the hero (SCREEN_SPECS §Home item 1):
+/// magnifier glyph + "Search any product…" placeholder text. NOT an editable
+/// field — a button that looks like one, so Home keeps its single-focus
+/// hierarchy and the actual field lives on the pushed Search screen (Oasis
+/// STEAL #22). The glyph scales with Dynamic Type (Chunk-0 `@ScaledMetric`).
+private struct SearchFieldRow: View {
+    @ScaledMetric(relativeTo: .body) private var glyph: CGFloat = 17
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s3) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: glyph, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+            Text("Search any product…")
+                .font(.body)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Theme.Space.s4)
+        .frame(minHeight: 52)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceCard(padded: false)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Search any product")
+        .accessibilityAddTraits(.isButton)
     }
 }
 

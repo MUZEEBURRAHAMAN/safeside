@@ -116,6 +116,53 @@ struct APIClient {
         try await request("product/\(barcode)")
     }
 
+    private struct SearchEnvelope: Decodable { let results: [SearchResult] }
+
+    /// Name-search over Open Food Facts (`GET /search?q=`), returning our
+    /// normalized rows with OUR cached score attached where we have one.
+    /// Built with `URLComponents`/`queryItems` rather than the path-appending
+    /// `request(_:)` helper, which percent-encodes `?`/`=` in the path (they'd
+    /// otherwise be escaped and break the query). Same auth headers as
+    /// `request(_:)`. A typed barcode never comes here — the client routes
+    /// barcodes to `product(barcode:)` directly (identical scored path).
+    func search(query: String) async throws -> [SearchResult] {
+        guard let baseURL = AppConfig.functionsBaseURL,
+              let anonKey = AppConfig.supabaseAnonKey else {
+            throw APIError.notConfigured
+        }
+
+        guard var components = URLComponents(
+            url: baseURL.appendingPathComponent("search"),
+            resolvingAgainstBaseURL: false
+        ) else { throw APIError.badResponse }
+        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        guard let url = components.url else { throw APIError.badResponse }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        let token = await session.accessToken ?? anonKey
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let data: Data
+        let resp: URLResponse
+        do {
+            (data, resp) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw APIError.transport
+        }
+
+        guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse }
+        guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse }
+
+        do {
+            return try JSONDecoder().decode(SearchEnvelope.self, from: data).results
+        } catch {
+            throw APIError.decoding
+        }
+    }
+
     /// AI ingredient explanations for a product (cached backend; see AI_INGREDIENT_EXPLANATION.md).
     func ingredients(productID: String) async throws -> [Ingredient] {
         try await request("product/\(productID)/ingredients")

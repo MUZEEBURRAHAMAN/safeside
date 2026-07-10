@@ -845,12 +845,27 @@ struct ScanScreen: View {
     // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
     // and @State default values are evaluated outside the main actor).
     @State private var availability = CameraAvailability.ready
+    /// Presents the Search screen (barcode mode) as a sheet — the last
+    /// dead-end escape when a label is broken/absent (SCREEN_SPECS §Home item
+    /// 2). A sheet, not a push, keeps the immersive dark scan chrome intact
+    /// underneath.
+    @State private var showManualEntry = false
 
     var body: some View {
         content
             .navigationTitle("Scan")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { availability = .current }
+            .sheet(isPresented: $showManualEntry) {
+                NavigationStack {
+                    SearchView(startInBarcodeMode: true)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Close") { showManualEntry = false }
+                            }
+                        }
+                }
+            }
             .navigationDestination(isPresented: $vm.showProduct) {
                 if let product = vm.product {
                     ProductView(product: product)
@@ -933,7 +948,8 @@ struct ScanScreen: View {
                 primaryTitle: "Snap the label",
                 primaryAction: { Task { await captureLabel() } },
                 secondaryTitle: "Try another scan",
-                secondaryAction: { vm.reset() }
+                secondaryAction: { vm.reset() },
+                manualEntryAction: { showManualEntry = true }
             )
         case .labelNotFound:
             ocrBanner(
@@ -943,14 +959,17 @@ struct ScanScreen: View {
                 primaryTitle: "Try again",
                 primaryAction: { Task { await captureLabel() } },
                 secondaryTitle: "Try another scan",
-                secondaryAction: { vm.reset() }
+                secondaryAction: { vm.reset() },
+                manualEntryAction: { showManualEntry = true }
             )
         case .error(let message):
             calmBanner(
                 title: "Something went wrong.",
                 message: message,
-                actionTitle: "Retry"
-            ) { vm.reset() }
+                actionTitle: "Retry",
+                action: { vm.reset() },
+                manualEntryAction: { showManualEntry = true }
+            )
         }
     }
 
@@ -999,14 +1018,31 @@ struct ScanScreen: View {
         }
     }
 
+    /// Quiet lime text button for the "Enter barcode manually" way-out —
+    /// tertiary, below the primary/secondary group, so a broken/absent label
+    /// still always has a way to type the barcode (never a dead end).
+    private func manualEntryButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text("Enter barcode manually")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.lime)
+                .frame(minHeight: 44)
+                .padding(.horizontal, Theme.Space.s2)
+        }
+    }
+
     private func calmBanner(title: String, message: String, actionTitle: String,
-                             action: @escaping () -> Void) -> some View {
+                             action: @escaping () -> Void,
+                             manualEntryAction: (() -> Void)? = nil) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.s3) {
             VStack(alignment: .leading, spacing: Theme.Space.s2) {
                 Text(title).font(.headline).foregroundStyle(Theme.onGreen)
                 Text(message).font(.subheadline).foregroundStyle(Theme.onGreen.opacity(0.85))
             }
             primaryPillButton(actionTitle, action: action)
+            if let manualEntryAction {
+                manualEntryButton(manualEntryAction)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Space.s4)
@@ -1022,7 +1058,8 @@ struct ScanScreen: View {
     /// Dynamic Type sizes so labels never truncate/clip side by side.
     private func ocrBanner(title: String, message: String, hint: String?,
                             primaryTitle: String, primaryAction: @escaping () -> Void,
-                            secondaryTitle: String, secondaryAction: @escaping () -> Void) -> some View {
+                            secondaryTitle: String, secondaryAction: @escaping () -> Void,
+                            manualEntryAction: (() -> Void)? = nil) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.s3) {
             VStack(alignment: .leading, spacing: Theme.Space.s2) {
                 Text(title).font(.headline).foregroundStyle(Theme.onGreen)
@@ -1041,6 +1078,9 @@ struct ScanScreen: View {
                     primaryPillButton(primaryTitle, action: primaryAction)
                     secondaryPillButton(secondaryTitle, action: secondaryAction)
                 }
+            }
+            if let manualEntryAction {
+                manualEntryButton(manualEntryAction)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
