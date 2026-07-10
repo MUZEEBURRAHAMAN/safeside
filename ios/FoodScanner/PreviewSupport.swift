@@ -41,7 +41,25 @@ extension Product {
                                      url: "https://world.openfoodfacts.org")]
                 ),
             ],
-            scoreVersion: "1.0.0"
+            scoreVersion: "1.0.0",
+            highlights: NutrientHighlights(
+                watchOuts: [
+                    MeterRow(label: "Saturated fat", value: 3.1, unit: "g", tier: "moderate",
+                             meterFraction: 0.62, kind: "watchOut",
+                             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)",
+                                              url: "https://world.openfoodfacts.org/nutriscore")]),
+                    MeterRow(label: "Salt", value: 1.2, unit: "g", tier: "moderate",
+                             meterFraction: 0.8, kind: "watchOut",
+                             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)", url: nil)]),
+                ],
+                benefits: [
+                    MeterRow(label: "Fiber", value: 3.4, unit: "g", tier: "good source",
+                             meterFraction: 0.57, kind: "benefit",
+                             sources: [Source(name: "Nutri-Score nutrient model (via Open Food Facts)", url: nil)]),
+                ],
+                toKnowAboutCount: 1,
+                beneficialCount: 1
+            )
         ),
         ingredients: [
             Ingredient(
@@ -66,7 +84,8 @@ extension Product {
                 misconceptions: ["A general 'MSG sensitivity' is not supported by controlled studies."],
                 foundIn: ["savoury snacks", "seasonings", "soups"],
                 sources: [Source(name: "EFSA re-evaluation, 2017", url: "https://www.efsa.europa.eu/")],
-                confidence: "high"
+                confidence: "high",
+                category: "Flavour enhancers"
             ),
             Ingredient(
                 name: "Natural flavouring",
@@ -76,7 +95,8 @@ extension Product {
             ),
         ],
         allergens: ["milk"],
-        dataConfidence: "limited"
+        dataConfidence: "limited",
+        fetchedAt: "2026-07-08T12:00:00Z"
     )
 }
 #endif

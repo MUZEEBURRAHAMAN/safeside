@@ -109,6 +109,9 @@
 - Report free-text label: "Tell us more (optional)"
 - Report submit: "Send report" → Success: "Thanks — we'll review it."
 - Report error: "Couldn't send your report. Check your connection and try again." [Retry]
+- Additive severity words (map from `riskTier` low/moderate/higher — neutral, mirrors the in-product "…-concern additive" language, never "bad/toxic"): "Lower concern" · "Moderate concern" · "Higher concern"
+- Additive category pill labels (factual INS-class names, from the E-number): "Colours" · "Preservatives" · "Antioxidants" · "Thickeners & emulsifiers" · "Acidity regulators" · "Flavour enhancers" · "Sweeteners" · "Other"
+- Meter tier-word ladder (backend-owned; the client only interpolates the word) — Watch-outs: "low" · "moderate" · "high"; Benefits: "low" · "some" · "good source"
 
 ### Search & manual barcode (Chunk 2)
 - Home field placeholder: "Search any product…"

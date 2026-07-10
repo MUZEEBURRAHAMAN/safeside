@@ -20,6 +20,7 @@
  */
 
 import type { LlmClient } from "../_shared/llm.ts";
+import { additiveCategory } from "../_shared/additives/category.ts";
 import {
   buildKbIndex,
   DEFAULT_LOCALE,
@@ -206,9 +207,13 @@ export async function handleIngredients(
 
   const ingredients: IngredientOut[] = [];
   for (const { display, entry } of candidates) {
+    // Additive INS-class pill: derived from the E-number (KB id "en:eNNN" or a
+    // display token like "E150d"). Plain food tokens → null (no pill).
+    const category = additiveCategory(entry?.id ?? display);
+
     if (entry === null) {
       // KB MISS — never call the LLM, never fabricate.
-      ingredients.push(unknownIngredient(display));
+      ingredients.push({ ...unknownIngredient(display), category });
       continue;
     }
 
@@ -218,7 +223,7 @@ export async function handleIngredients(
       DEFAULT_LOCALE,
     );
     if (cached) {
-      ingredients.push(cached);
+      ingredients.push({ ...cached, category });
       continue;
     }
 
@@ -229,7 +234,7 @@ export async function handleIngredients(
       DEFAULT_LOCALE,
       explanation,
     );
-    ingredients.push(explanation);
+    ingredients.push({ ...explanation, category });
   }
 
   return json({ ingredients });

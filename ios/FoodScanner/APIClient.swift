@@ -143,4 +143,25 @@ struct APIClient {
         let body = try JSONEncoder().encode(ChatRequestBody(productId: productID, messages: messages))
         return try await request("chat", method: "POST", body: body)
     }
+
+    /// A "Report an issue" reason — raw values match the backend
+    /// `report_reason_type` enum + the product-report edge function contract.
+    enum ReportReason: String, CaseIterable {
+        case score_off, wrong_info, missing_ingredient, other
+    }
+
+    /// File a product report (`POST product-report`). Fire-and-confirm: the
+    /// backend inserts into `product_reports` and returns `{ ok: true }`.
+    /// Offline surfaces as `APIError.transport` so the sheet can offer Retry.
+    func reportIssue(productID: String, reason: ReportReason, detail: String?) async throws {
+        struct Body: Encodable { let productId: String; let reason: String; let detail: String? }
+        let data = try JSONEncoder().encode(
+            Body(productId: productID, reason: reason.rawValue, detail: detail)
+        )
+        let _: EmptyResponse = try await request("product-report", method: "POST", body: data)
+    }
 }
+
+/// Decodes an empty/`{ ok: true }`-style success body for endpoints whose
+/// result we don't need to read (e.g. product-report).
+struct EmptyResponse: Decodable {}

@@ -64,6 +64,12 @@ export interface IngredientOut {
   foundIn: string[];
   sources: KbSource[];
   confidence: Confidence;
+  /**
+   * Additive INS-class label (e.g. "Preservatives") for E-number ingredients,
+   * or null for plain food tokens. Derived deterministically at response-shaping
+   * time (see _shared/additives/category.ts) — not stored in the cache.
+   */
+  category?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +133,7 @@ export function unknownIngredient(name: string): IngredientOut {
     foundIn: [],
     sources: [],
     confidence: "limited",
+    category: null,
   };
 }
 

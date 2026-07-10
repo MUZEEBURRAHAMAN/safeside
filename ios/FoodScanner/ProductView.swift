@@ -40,6 +40,12 @@ struct ProductView: View {
     @State private var showReportIssueSheet = false
     @State private var showChat = false
 
+    /// Chunk 2 (Search / deep-link) will flip this on to construct `ProductView`
+    /// before the product resolves, showing `ResultSkeletonView`. Today the
+    /// caller always passes a fully-fetched `Product`, so this stays false and
+    /// behaviour is unchanged.
+    @State private var isResolving = false
+
     private enum IngredientsLoadPhase: Equatable { case idle, loading, failed }
 
     init(product: Product) {
@@ -47,7 +53,23 @@ struct ProductView: View {
         _workingProduct = State(initialValue: product)
     }
 
+    #if DEBUG
+    /// Preview-only: boot straight into the in-flight (skeleton) state so the
+    /// screenshot matrix can capture `ResultSkeletonView` inside `ProductView`.
+    init(product: Product, previewResolving: Bool) {
+        self.product = product
+        _workingProduct = State(initialValue: product)
+        _isResolving = State(initialValue: previewResolving)
+    }
+    #endif
+
     private var band: ScoreBand { workingProduct.score?.band ?? .unknown }
+
+    private var showsSkeleton: Bool { isResolving }
+
+    /// Backend-computed Watch-outs / Benefits meters + pre-read counts. The
+    /// client renders these verbatim and never derives a meter value itself.
+    private var highlights: NutrientHighlights? { workingProduct.score?.highlights }
 
     /// A pantry-list read has a `score` with empty `factors` (see
     /// `PantryEntry.asProduct()`); an unscored product has no `score` at
@@ -97,50 +119,13 @@ struct ProductView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.s5) {
-                identityHeader
-                    .opacity(identityVisible ? 1 : 0)
-                    .scaleEffect(identityVisible ? 1 : 0.97)
-                    .onAppear { revealIdentity() }
-
-                allergenAlertBannerOrNone
-
-                triMetricSectionOrNone
-
-                whyScoreOrNote
-
-                ingredientsSection
-
-                allergensSection
-
-                if !allSources.isEmpty {
-                    SourcesSection(sources: allSources)
-                }
-
-                UtilityRowsSection(
-                    onScoringInfo: { showMethodologySheet = true },
-                    onReportIssue: { showReportIssueSheet = true }
-                )
-
-                VStack(spacing: Theme.Space.s3) {
-                    // Grounded per-product AI chat (see ChatView.swift) —
-                    // secondary pill so it never competes with the primary
-                    // next-action below.
-                    askAboutProductButton
-
-                    // Next action — never a dead-end. The swaps engine isn't
-                    // built yet (Phase 3), so this opens a calm sheet with a
-                    // real, generic next step instead of a fabricated swap.
-                    NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
-                        showBetterOptionSheet = true
-                    }
-                }
-
-                AttributionFooter()
-                    .frame(maxWidth: .infinity)
+            // Chunk 2: set isResolving=true when opened pre-fetch from
+            // Search/deep-link. Dormant today (product is always fetched).
+            if showsSkeleton {
+                ResultSkeletonView()
+            } else {
+                resultContent
             }
-            .padding(.horizontal, Theme.Space.s4)
-            .padding(.vertical, Theme.Space.s5)
         }
         .background(Theme.canvas)
         .navigationBarTitleDisplayMode(.inline)
@@ -159,7 +144,7 @@ struct ProductView: View {
             MethodologySheet()
         }
         .sheet(isPresented: $showReportIssueSheet) {
-            ReportIssueSheet(productName: workingProduct.name)
+            ReportIssueSheet(productID: workingProduct.id, productName: workingProduct.name)
         }
         .sheet(isPresented: $showChat) {
             ChatView(product: workingProduct)
@@ -174,6 +159,81 @@ struct ProductView: View {
     }
 
     // MARK: Sections
+
+    /// The full result layout (everything but the loading skeleton), in
+    /// SCREEN_SPECS §4 top→bottom order.
+    private var resultContent: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s5) {
+            identityHeader
+                .opacity(identityVisible ? 1 : 0)
+                .scaleEffect(identityVisible ? 1 : 0.97)
+                .onAppear { revealIdentity() }
+
+            allergenAlertBannerOrNone
+
+            triMetricSectionOrNone
+
+            // Watch-outs / Benefits bar-meters — real per-100 g values from
+            // score.highlights (backend-computed). Each renders only when its
+            // array is non-empty; the meters visually absorb the factor rows
+            // while "Why this score" keeps the full sourced breakdown below.
+            if let highlights {
+                MetersSection(title: "Watch-outs", rows: highlights.watchOuts)
+                MetersSection(title: "Benefits", rows: highlights.benefits)
+            }
+
+            whyScoreOrNote
+
+            ingredientPreReadOrNone
+
+            AdditivesSummarySection(ingredients: displayIngredients)
+
+            ingredientsSection
+
+            allergensSection
+
+            if !allSources.isEmpty {
+                SourcesSection(sources: allSources, fetchedDate: workingProduct.fetchedAt)
+            }
+
+            UtilityRowsSection(
+                onScoringInfo: { showMethodologySheet = true },
+                onReportIssue: { showReportIssueSheet = true }
+            )
+
+            VStack(spacing: Theme.Space.s3) {
+                // Grounded per-product AI chat (see ChatView.swift) —
+                // secondary pill so it never competes with the primary
+                // next-action below.
+                askAboutProductButton
+
+                // Next action — never a dead-end. The swaps engine isn't
+                // built yet (Phase 3), so this opens a calm sheet with a
+                // real, generic next step instead of a fabricated swap.
+                NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
+                    showBetterOptionSheet = true
+                }
+            }
+
+            AttributionFooter()
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, Theme.Space.s4)
+        .padding(.vertical, Theme.Space.s5)
+    }
+
+    /// Calm pre-read above the ingredient list. Hidden when both counts are 0
+    /// and there are no ingredients (never a "0 · 0" row on a thin product).
+    @ViewBuilder
+    private var ingredientPreReadOrNone: some View {
+        if let highlights,
+           highlights.toKnowAboutCount > 0 || highlights.beneficialCount > 0 || !displayIngredients.isEmpty {
+            IngredientCountPreRead(
+                toKnowAboutCount: highlights.toKnowAboutCount,
+                beneficialCount: highlights.beneficialCount
+            )
+        }
+    }
 
     /// 1) Floating product image · 2) name/brand + score ring · 3) trust
     /// chips. Reflows to a vertical stack at accessibility Dynamic Type
@@ -402,7 +462,8 @@ struct ProductView: View {
             score: mergedScore,
             ingredients: workingProduct.ingredients.isEmpty ? fresh.ingredients : workingProduct.ingredients,
             allergens: workingProduct.allergens.isEmpty ? fresh.allergens : workingProduct.allergens,
-            dataConfidence: fresh.dataConfidence
+            dataConfidence: fresh.dataConfidence,
+            fetchedAt: workingProduct.fetchedAt ?? fresh.fetchedAt
         )
     }
 
@@ -480,6 +541,15 @@ struct ProductView: View {
 #Preview("From pantry — thin read") {
     NavigationStack {
         ProductView(product: .previewFromPantryThin)
+    }
+    .environment(SessionService())
+    .environment(PantryService(session: SessionService()))
+    .environment(ProfileService(session: SessionService()))
+}
+
+#Preview("Loading skeleton via ProductView") {
+    NavigationStack {
+        ProductView(product: .previewHighFullConfidence, previewResolving: true)
     }
     .environment(SessionService())
     .environment(PantryService(session: SessionService()))

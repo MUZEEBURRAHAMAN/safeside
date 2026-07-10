@@ -342,6 +342,22 @@ Deno.test("an additive in both the text and additives_tags is explained once", a
   assertEquals(e338[0].riskTier, "moderate");
 });
 
+Deno.test("additive rows carry an INS-class category; plain food tokens carry null", async () => {
+  const { deps } = makeDeps({
+    product: {
+      additivesTags: ["en:e621"], // flavour enhancer
+      ingredientsText: "Sugar, Weirdium",
+    },
+  });
+  const res = await handleIngredients(request(`/ingredients/${PRODUCT_ID}`), deps);
+  const { ingredients } = await res.json() as { ingredients: IngredientOut[] };
+  const byName = Object.fromEntries(ingredients.map((i) => [i.name, i]));
+
+  assertEquals(byName["Monosodium glutamate"].category, "Flavour enhancers");
+  assertEquals(byName["Sugar"].category, null); // plain food token → no pill
+  assertEquals(byName["Weirdium"].category, null); // unknown, non-additive → no pill
+});
+
 Deno.test("an additive tag with no KB entry → limited state, never the LLM", async () => {
   const { deps, state } = makeDeps({
     product: { additivesTags: ["en:e999"], ingredientsText: null },

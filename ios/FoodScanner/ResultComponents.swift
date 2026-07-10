@@ -376,24 +376,45 @@ struct ScoreFactorRow: View {
 /// (docs/SCORING_METHODOLOGY.md — "the product's moat").
 struct SourceLink: View {
     let source: Source
+    /// When set, the row reads "{name} · updated {date}" (COPY_DECK source-row
+    /// pattern). Only passed for live-fetched data provenance (e.g. Open Food
+    /// Facts); versioned reference tables stay undated. Never "updated (nil)".
+    var updatedDate: String? = nil
+
+    private var nameLine: String {
+        if let updatedDate { return "\(source.name) · updated \(updatedDate)" }
+        return source.name
+    }
 
     var body: some View {
         Group {
             if let urlString = source.url, let url = URL(string: urlString) {
                 Link(destination: url) {
                     HStack(spacing: 4) {
-                        Text("Source: \(source.name)")
+                        Text("Source: \(nameLine)")
                         Image(systemName: "arrow.up.right").font(.caption2)
                     }
                 }
                 .foregroundStyle(Theme.greenDeep)
             } else {
-                Text("Source: \(source.name)")
+                Text("Source: \(nameLine)")
                     .foregroundStyle(Theme.textSecondary)
             }
         }
         .font(.caption)
     }
+}
+
+/// Format an ISO8601 fetched-at timestamp → an abbreviated date ("Jul 8, 2026")
+/// for dated source rows, or nil when it's absent/unparseable (so we never
+/// render "updated (nil)").
+func formattedFetchedDate(_ iso: String?) -> String? {
+    guard let iso, !iso.isEmpty else { return nil }
+    let withFractional = ISO8601DateFormatter()
+    withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let plain = ISO8601DateFormatter()
+    guard let date = withFractional.date(from: iso) ?? plain.date(from: iso) else { return nil }
+    return date.formatted(date: .abbreviated, time: .omitted)
 }
 
 /// The full "why this score" breakdown, collapsible (default OPEN — this is
@@ -1071,6 +1092,233 @@ struct IngredientsLoadErrorView: View {
     }
 }
 
+// MARK: - Nutrient meters (Watch-outs / Benefits) — Chunk 1
+
+/// Neutral tier → colour map for a meter row. The tier word itself is
+/// backend-owned (COPY_DECK §Result upgrades ladder); this only maps it to a
+/// calm score-band colour. Never alarm-red — a high watch-out uses clay
+/// (`scoreLow`), per CLAUDE.md's ED-safe rule.
+private func meterTierColor(kind: String, tier: String) -> Color {
+    switch (kind, tier) {
+    case ("watchOut", "high"): return Theme.scoreLow      // clay, never red
+    case ("watchOut", "moderate"): return Theme.scoreMid
+    case ("benefit", "good source"): return Theme.scoreHigh
+    case ("benefit", "some"): return Theme.scoreMid
+    default: return Theme.scoreUnknown                    // "low" / anything else
+    }
+}
+
+/// A labeled bar meter for one Watch-out / Benefit. Every number here —
+/// `value`, `unit`, `tier`, `meterFraction` — is computed on the backend from
+/// `products.nutrients` (CLAUDE.md #5); this view performs ZERO arithmetic on
+/// them, it only maps the tier to a colour and renders. Tapping reveals the
+/// row's source(s) (teardown #5: sourced rows expand on tap).
+struct MeterRowView: View {
+    let row: MeterRow
+    /// Full-bar reference. Defaults to 1 because the backend already sends a
+    /// clamped 0…1 `meterFraction`; Compare (Chunk 5) can pass a shared scale.
+    var maxScale: Double = 1
+
+    @State private var showSources = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var tint: Color { meterTierColor(kind: row.kind, tier: row.tier) }
+
+    /// The already-clamped backend fraction, only re-projected onto a shared
+    /// scale when a caller overrides `maxScale` (Compare). No value derivation.
+    private var fraction: Double {
+        maxScale == 1 ? row.meterFraction : min(max(row.meterFraction / maxScale, 0), 1)
+    }
+
+    private var valueText: String {
+        // `.formatted()` is display formatting (drops a trailing .0), never a
+        // re-round of the backend value.
+        "\(row.value.formatted()) \(row.unit)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s1) {
+            Button {
+                guard !row.sources.isEmpty else { return }
+                withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
+                    showSources.toggle()
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
+                        Text(row.label)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Theme.textPrimary)
+                        Spacer(minLength: Theme.Space.s2)
+                        Text(valueText)
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.textPrimary)
+                    }
+                    ProgressView(value: fraction, total: 1)
+                        .tint(tint)
+                        .accessibilityHidden(true)
+                    Text(row.tier)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(tint)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showSources {
+                ForEach(row.sources, id: \.self) { SourceLink(source: $0) }
+                    .transition(.opacity)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.label), \(valueText), \(row.tier)")
+        .accessibilityHint(row.sources.isEmpty ? "" : "Double tap to show sources")
+    }
+}
+
+/// A "Watch-outs" or "Benefits" meter section. Renders nothing when `rows` is
+/// empty (never a phantom empty section). Reusable + `MeterRow`-driven so
+/// Compare (Chunk 5) can drop it into a shared-scale two-column layout —
+/// hence `maxScale` is a parameter, not a hardcode.
+struct MetersSection: View {
+    let title: String              // "Watch-outs" / "Benefits" — COPY_DECK verbatim
+    let rows: [MeterRow]
+    var maxScale: Double = 1
+
+    var body: some View {
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Space.s3) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                VStack(spacing: Theme.Space.s3) {
+                    ForEach(rows) { MeterRowView(row: $0, maxScale: maxScale) }
+                }
+                .surfaceCard()
+            }
+            // SCREEN_SPECS §4 Responsive — cap text width on wide screens.
+            .frame(maxWidth: 560, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - Ingredient pre-read + additive summary — Chunk 1
+
+/// One calm pre-read row above the ingredient list. Both counts are computed
+/// on the backend (`score.highlights`); the client never counts. Neutral tone,
+/// small band-coloured dots, never red.
+struct IngredientCountPreRead: View {
+    let toKnowAboutCount: Int
+    let beneficialCount: Int
+
+    private func dot(_ color: Color) -> some View {
+        Circle().fill(color).frame(width: 7, height: 7)
+    }
+
+    var body: some View {
+        // Verbatim COPY_DECK: "{n} ingredients to know about · {n} beneficial".
+        FlowLayout(spacing: Theme.Space.s2) {
+            HStack(spacing: 6) {
+                dot(Theme.scoreMid)
+                Text("\(toKnowAboutCount) ingredients to know about")
+            }
+            Text("·").foregroundStyle(Theme.textSecondary)
+            HStack(spacing: 6) {
+                dot(Theme.scoreHigh)
+                Text("\(beneficialCount) beneficial")
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(Theme.textSecondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(toKnowAboutCount) ingredients to know about, \(beneficialCount) beneficial"
+        )
+    }
+}
+
+/// Neutral severity word for an additive risk tier (COPY_DECK §Result
+/// upgrades). Nil for a non-additive / untiered ingredient.
+func additiveSeverityWord(_ riskTier: String?) -> String? {
+    switch riskTier?.lowercased() {
+    case "low": return "Lower concern"
+    case "moderate": return "Moderate concern"
+    case "higher": return "Higher concern"
+    default: return nil
+    }
+}
+
+/// Compact additive summary row: name + a neutral severity chip (tinted by
+/// `riskTier`, same calm band colours as `IngredientCard`) + a factual INS-class
+/// category pill. The full `IngredientCard` still renders below — this is the
+/// scannable at-a-glance summary (teardown #9: severity word + category).
+struct AdditiveSummaryRow: View {
+    let ingredient: Ingredient
+
+    private var severityColor: Color {
+        switch ingredient.riskTier?.lowercased() {
+        case "low": return Theme.scoreHigh
+        case "moderate": return Theme.scoreMid
+        case "higher": return Theme.scoreLow
+        default: return Theme.scoreUnknown
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            Text(ingredient.name)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Theme.textPrimary)
+            FlowLayout(spacing: Theme.Space.s2) {
+                if let word = additiveSeverityWord(ingredient.riskTier) {
+                    Text(word)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(severityColor)
+                        .padding(.horizontal, Theme.Space.s3)
+                        .padding(.vertical, Theme.Space.s1)
+                        .background(severityColor.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().strokeBorder(severityColor.opacity(0.4), lineWidth: 1))
+                }
+                if let category = ingredient.category {
+                    Text(category)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(.horizontal, Theme.Space.s3)
+                        .padding(.vertical, Theme.Space.s1)
+                        .background(Theme.surfaceAlt, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 1))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Groups the additive summary rows into one flat card, shown only when the
+/// product has ≥1 additive (an ingredient carrying a non-nil `category`).
+struct AdditivesSummarySection: View {
+    let ingredients: [Ingredient]
+
+    private var additives: [Ingredient] { ingredients.filter { $0.category != nil } }
+
+    var body: some View {
+        if !additives.isEmpty {
+            SectionCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(additives.enumerated()), id: \.element.id) { index, ingredient in
+                        AdditiveSummaryRow(ingredient: ingredient)
+                        if index < additives.count - 1 {
+                            HairlineDivider().padding(.vertical, Theme.Space.s3)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Sources
 
 /// The collapsible "Sources" section — every factor + ingredient citation,
@@ -1079,6 +1327,16 @@ struct IngredientsLoadErrorView: View {
 /// reference's plain "Sources" list.
 struct SourcesSection: View {
     let sources: [Source]
+    /// ISO timestamp the product data was fetched (`Product.fetchedAt`). Dates
+    /// only the Open Food Facts provenance rows — that's what this timestamp
+    /// describes. Versioned reference tables (additive table) stay undated.
+    var fetchedDate: String? = nil
+
+    private var formattedDate: String? { formattedFetchedDate(fetchedDate) }
+
+    private func updatedDate(for source: Source) -> String? {
+        source.name.localizedCaseInsensitiveContains("Open Food Facts") ? formattedDate : nil
+    }
 
     var body: some View {
         CollapsibleSection(initiallyExpanded: false, cardStyle: false) {
@@ -1094,7 +1352,7 @@ struct SourcesSection: View {
         } content: {
             VStack(alignment: .leading, spacing: Theme.Space.s3) {
                 ForEach(sources, id: \.self) { source in
-                    SourceLink(source: source)
+                    SourceLink(source: source, updatedDate: updatedDate(for: source))
                 }
             }
         }
@@ -1206,49 +1464,163 @@ struct MethodologySheet: View {
     }
 }
 
-/// "Report an issue" — honest about the current state (in-app reporting
-/// isn't wired to a backend yet) rather than faking a submit-and-confirm
-/// flow, same principle as `NextActionSheet` below: never fabricate a
-/// feature that isn't real (docs/COPY_DECK.md voice: clear, calm, honest).
+/// "Report an issue" — a real round-trip to `POST product-report`. Reason
+/// single-select + optional free text → submit → an honest thanks state, and
+/// a Retry error state on failure (never a dead-end, principle #4). Copy is
+/// verbatim from docs/COPY_DECK.md §Result upgrades.
 struct ReportIssueSheet: View {
+    let productID: String
     let productName: String
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(SessionService.self) private var session
+
+    private enum Phase: Equatable { case editing, sending, done, failed }
+
+    /// Display label ↔ backend reason. Single-select (radio), not multi-select.
+    private static let reasons: [(label: String, reason: APIClient.ReportReason)] = [
+        ("Score seems off", .score_off),
+        ("Wrong product info", .wrong_info),
+        ("Missing ingredient", .missing_ingredient),
+        ("Something else", .other),
+    ]
+
+    @State private var selected: APIClient.ReportReason?
+    @State private var detail: String = ""
+    @State private var phase: Phase = .editing
+
+    private var apiClient: APIClient { APIClient(session: session) }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                    VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                        Text("In-app reporting isn't live yet")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("We'd rather tell you that than collect a report and quietly drop it. If something about \u{201c}\(productName)\u{201d} looks off — the score, an ingredient, an allergen — it's a known gap, and reporting will be one of the first things we wire up.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    SectionCard {
-                        Text("In the meantime, \u{201c}How scoring works\u{201d} often answers why a product landed where it did.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            Group {
+                switch phase {
+                case .done: thanksState
+                default: editingState
                 }
-                .padding(Theme.Space.s4)
             }
             .background(Theme.canvas)
-            .navigationTitle("Report an issue")
+            .navigationTitle("What looks wrong?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(phase == .done ? "Done" : "Close") { dismiss() }
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    // MARK: Editing / sending / failed
+
+    private var editingState: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                    ForEach(Self.reasons, id: \.reason) { item in
+                        reasonRow(label: item.label, reason: item.reason)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                    Text("Tell us more (optional)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    TextEditor(text: $detail)
+                        .frame(minHeight: 96)
+                        .padding(Theme.Space.s2)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .strokeBorder(Theme.border, lineWidth: 1)
+                        )
+                        .disabled(phase == .sending)
+                }
+
+                if phase == .failed {
+                    Text("Couldn't send your report. Check your connection and try again.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.ResultScreen.warningTextOnLight)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button(action: submit) {
+                    HStack(spacing: Theme.Space.s2) {
+                        if phase == .sending { ProgressView().tint(Theme.onGreen) }
+                        Text(phase == .failed ? "Retry" : "Send report")
+                            .font(.body.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .foregroundStyle(Theme.onGreen)
+                .background(
+                    (selected == nil ? Theme.scoreUnknown : Theme.greenDeep),
+                    in: Capsule()
+                )
+                .disabled(selected == nil || phase == .sending)
+            }
+            .padding(Theme.Space.s4)
+        }
+    }
+
+    private func reasonRow(label: String, reason: APIClient.ReportReason) -> some View {
+        Button {
+            selected = reason
+        } label: {
+            HStack(spacing: Theme.Space.s3) {
+                Image(systemName: selected == reason ? "largecircle.fill.circle" : "circle")
+                    .font(.body)
+                    .foregroundStyle(selected == reason ? Theme.greenDeep : Theme.textSecondary)
+                Text(label)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(phase == .sending)
+        .accessibilityAddTraits(selected == reason ? [.isSelected] : [])
+    }
+
+    private var thanksState: some View {
+        VStack(spacing: Theme.Space.s4) {
+            Spacer(minLength: 0)
+            Image(systemName: "checkmark.seal.fill")
+                .font(.largeTitle)
+                .foregroundStyle(Theme.greenDeep)
+            Text("Thanks — we'll review it.")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+            Button("Done") { dismiss() }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.greenDeep)
+                .frame(minHeight: 44)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(Theme.Space.s4)
+    }
+
+    private func submit() {
+        guard let reason = selected else { return }
+        phase = .sending
+        let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            do {
+                try await apiClient.reportIssue(
+                    productID: productID,
+                    reason: reason,
+                    detail: trimmed.isEmpty ? nil : trimmed
+                )
+                phase = .done
+            } catch {
+                phase = .failed
+            }
+        }
     }
 }
 
@@ -1520,6 +1892,63 @@ struct ResultSkeletonView: View {
 #Preview("Report issue sheet") {
     Color.clear
         .sheet(isPresented: .constant(true)) {
-            ReportIssueSheet(productName: "Sea Salt Popped Corn Chips")
+            ReportIssueSheet(productID: "sample-1", productName: "Sea Salt Popped Corn Chips")
+                .environment(SessionService())
         }
+}
+
+#if DEBUG
+private let sampleWatchOuts: [MeterRow] = [
+    MeterRow(label: "Saturated fat", value: 26.7, unit: "g", tier: "high",
+             meterFraction: 1.0, kind: "watchOut",
+             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)",
+                              url: "https://world.openfoodfacts.org/nutriscore")]),
+    MeterRow(label: "Sugars", value: 56.3, unit: "g", tier: "high",
+             meterFraction: 1.0, kind: "watchOut",
+             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)", url: nil)]),
+    MeterRow(label: "Salt", value: 0.1, unit: "g", tier: "low",
+             meterFraction: 0.07, kind: "watchOut",
+             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)", url: nil)]),
+]
+
+private let sampleBenefits: [MeterRow] = [
+    MeterRow(label: "Fiber", value: 4.5, unit: "g", tier: "good source",
+             meterFraction: 0.75, kind: "benefit",
+             sources: [Source(name: "Nutri-Score nutrient model (via Open Food Facts)", url: nil)]),
+    MeterRow(label: "Protein", value: 6.3, unit: "g", tier: "some",
+             meterFraction: 0.53, kind: "benefit",
+             sources: [Source(name: "Nutri-Score nutrient model (via Open Food Facts)", url: nil)]),
+]
+#endif
+
+#Preview("Meters — Watch-outs + Benefits") {
+    ScrollView {
+        VStack(alignment: .leading, spacing: Theme.Space.s5) {
+            MetersSection(title: "Watch-outs", rows: sampleWatchOuts)
+            MetersSection(title: "Benefits", rows: sampleBenefits)
+        }
+        .padding()
+    }
+    .background(Theme.canvas)
+}
+
+#Preview("Ingredient pre-read + additive summary") {
+    ScrollView {
+        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+            IngredientCountPreRead(toKnowAboutCount: 2, beneficialCount: 1)
+            AdditivesSummarySection(ingredients: [
+                Ingredient(name: "Monosodium glutamate", what: nil, whyUsed: nil, safety: nil,
+                           riskTier: "moderate", whoShouldAvoid: [], misconceptions: [],
+                           foundIn: [], sources: [], confidence: "high", category: "Flavour enhancers"),
+                Ingredient(name: "Sulphite ammonia caramel", what: nil, whyUsed: nil, safety: nil,
+                           riskTier: "higher", whoShouldAvoid: [], misconceptions: [],
+                           foundIn: [], sources: [], confidence: "high", category: "Colours"),
+                Ingredient(name: "Citric acid", what: nil, whyUsed: nil, safety: nil,
+                           riskTier: "low", whoShouldAvoid: [], misconceptions: [],
+                           foundIn: [], sources: [], confidence: "high", category: "Antioxidants"),
+            ])
+        }
+        .padding()
+    }
+    .background(Theme.canvas)
 }

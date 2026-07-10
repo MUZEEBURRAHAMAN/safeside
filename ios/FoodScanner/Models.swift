@@ -43,12 +43,39 @@ struct Source: Codable, Hashable {
     let url: String?
 }
 
+/// One Watch-outs / Benefits bar-meter row. Every value here — the number, its
+/// unit, the neutral tier word, and the 0…1 meter fraction — is computed on the
+/// backend from `products.nutrients` (CLAUDE.md #5). The client renders these
+/// verbatim and performs ZERO arithmetic on them.
+struct MeterRow: Codable, Identifiable {
+    var id: String { label }
+    let label: String        // "Saturated fat" | "Sugars" | "Salt" | "Fiber" | "Protein"
+    let value: Double        // rounded once, backend-owned
+    let unit: String         // "g"
+    let tier: String         // watch-outs: low|moderate|high · benefits: low|some|good source
+    let meterFraction: Double // 0…1, backend-owned
+    let kind: String         // "watchOut" | "benefit"
+    let sources: [Source]
+}
+
+/// Backend-computed meter rows + the pre-read counts shown on Result.
+struct NutrientHighlights: Codable {
+    let watchOuts: [MeterRow]
+    let benefits: [MeterRow]
+    let toKnowAboutCount: Int
+    let beneficialCount: Int
+}
+
 struct ScoreResult: Codable {
     let score: Int           // 0–100
     let band: ScoreBand
     let confidence: String   // "high" | "limited"
     let factors: [ScoreFactor]
     let scoreVersion: String
+    /// Watch-outs / Benefits meters + counts. Optional + defaulted so it decodes
+    /// from pre-Chunk-1 cached responses (absent → nil) and preview/test
+    /// construction sites needn't pass it.
+    var highlights: NutrientHighlights? = nil
 }
 
 struct Ingredient: Codable, Identifiable {
@@ -63,6 +90,10 @@ struct Ingredient: Codable, Identifiable {
     let foundIn: [String]
     let sources: [Source]
     let confidence: String   // "high" | "limited"
+    /// Additive INS-class pill label (e.g. "Preservatives") for E-number
+    /// ingredients; nil for plain food tokens. Backend-derived. Optional +
+    /// defaulted so pre-Chunk-1 responses and preview literals still work.
+    var category: String? = nil
 }
 
 struct Product: Codable, Identifiable {
@@ -75,4 +106,8 @@ struct Product: Codable, Identifiable {
     let ingredients: [Ingredient]
     let allergens: [String]
     let dataConfidence: String   // "high" | "limited"
+    /// ISO timestamp the product data was fetched/cached (for dated source
+    /// rows). Optional + defaulted for backward compatibility with pantry-thin
+    /// reads and pre-Chunk-1 responses.
+    var fetchedAt: String? = nil
 }

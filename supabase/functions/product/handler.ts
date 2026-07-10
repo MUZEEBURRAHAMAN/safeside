@@ -26,6 +26,10 @@ import {
 import additivesRisk from "../_shared/scoring/additives_risk.json" with {
   type: "json",
 };
+import {
+  buildNutrientHighlights,
+  type NutrientHighlights,
+} from "../_shared/scoring/meters.ts";
 import type { OffProduct } from "../_shared/off.ts";
 import { isNutrientsThin, mergeNutrients, type UsdaMatch } from "../_shared/usda.ts";
 
@@ -169,6 +173,10 @@ interface ScoreBody {
   confidence: string;
   factors: ScoreFactor[];
   scoreVersion: string;
+  // Watch-outs / Benefits bar-meters + pre-read counts, computed server-side
+  // from product.nutrients (CLAUDE.md #5). Hangs off `score` so an unknown
+  // product (no score object) surfaces no meters.
+  highlights?: NutrientHighlights;
 }
 
 interface ProductBody {
@@ -181,6 +189,7 @@ interface ProductBody {
   ingredients: unknown[]; // AI explanations arrive via a later endpoint
   allergens: string[];
   dataConfidence: string;
+  fetchedAt: string; // ISO — product.fetched_at, for dated source rows
 }
 
 function stripAllergenPrefix(tags: string[]): string[] {
@@ -200,6 +209,7 @@ function buildBody(
     ingredients: [],
     allergens: stripAllergenPrefix(product.allergens_tags),
     dataConfidence: product.data_confidence,
+    fetchedAt: product.fetched_at,
   };
 
   if ("output" in score) {
@@ -224,6 +234,14 @@ function buildBody(
         scoreVersion: r.score_version,
       };
     }
+  }
+
+  // Meters hang off `score` — never surfaced for an unknown product. Additive
+  // tiers are recomputed from the stored tags so the counts are available on
+  // BOTH the cache and fresh paths without a re-score.
+  if (body.score) {
+    const { tiers } = mapAdditiveTiers(product.additives_tags);
+    body.score.highlights = buildNutrientHighlights(product.nutrients, tiers);
   }
   return body;
 }

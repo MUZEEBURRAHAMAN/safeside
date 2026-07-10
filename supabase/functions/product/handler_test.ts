@@ -2,8 +2,9 @@
  * /product/:barcode handler tests — fake deps (no network, no DB).
  */
 
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { SCORE_VERSION } from "../_shared/scoring/engine.ts";
+import { buildNutrientHighlights } from "../_shared/scoring/meters.ts";
 import type { OffProduct } from "../_shared/off.ts";
 import type { UsdaMatch } from "../_shared/usda.ts";
 import {
@@ -462,4 +463,88 @@ Deno.test("enrichment: no USDA match leaves OFF nutrients unchanged", async () =
   assertEquals(state.enrichCalls.length, 1);
   const stored = state.upserts[0].nutrients as Record<string, unknown>;
   assertEquals(stored, { sugars_100g: 56.3 });
+});
+
+// ---------------------------------------------------------------------------
+// Nutrient highlights (score.highlights) + fetchedAt — Chunk 1
+// ---------------------------------------------------------------------------
+
+const RICH_NUTRIENTS = {
+  "saturated-fat_100g": 10.6,
+  sugars_100g: 56.3,
+  salt_100g: 0.107,
+  proteins_100g: 6.3,
+  fiber_100g: 3.5,
+};
+
+Deno.test("cache hit serves score.highlights without a re-score", async () => {
+  const fetchedAt = new Date(NOW - 5 * DAY_MS).toISOString();
+  const row = cachedRow(fetchedAt);
+  row.product.nutrients = { ...RICH_NUTRIENTS };
+  const { deps, state } = makeDeps({ cached: row });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  assertEquals(res.status, 200);
+  const body = await res.json();
+
+  assertEquals(state.offCalls.length, 0, "highlights must serve on the cache path");
+  assert(body.score.highlights, "highlights present on a cache hit");
+  assertEquals(
+    body.score.highlights.watchOuts.map((r: { label: string }) => r.label),
+    ["Saturated fat", "Sugars", "Salt"],
+  );
+  assertEquals(body.score.highlights.watchOuts[0].value, 10.6);
+  assertEquals(body.score.highlights.watchOuts[0].tier, "high");
+  assertEquals(
+    body.score.highlights.benefits.map((r: { label: string }) => r.label),
+    ["Fiber", "Protein"],
+  );
+  assertEquals(body.score.highlights.beneficialCount, 1); // fiber good source
+  // en:e322 + en:e471 are lower-concern → nothing to know about.
+  assertEquals(body.score.highlights.toKnowAboutCount, 0);
+});
+
+Deno.test("fresh path attaches highlights matching buildNutrientHighlights", async () => {
+  const { deps } = makeDeps({
+    cached: null,
+    off: offProduct({
+      nutriments: { ...RICH_NUTRIENTS },
+      additivesTags: ["en:e330", "en:e621", "en:e250"], // low, moderate, higher
+    }),
+  });
+
+  const res = await handleProduct(request("3017620422003"), deps);
+  const body = await res.json();
+
+  const expected = buildNutrientHighlights(RICH_NUTRIENTS, ["low", "moderate", "higher"]);
+  assertEquals(body.score.highlights, expected);
+  assertEquals(body.score.highlights.toKnowAboutCount, 2); // moderate + higher
+});
+
+Deno.test("unknown-band product leaks no highlights (they hang off score)", async () => {
+  const { deps } = makeDeps({
+    cached: null,
+    off: offProduct({
+      novaGroup: null,
+      nutriscoreGrade: null,
+      nutriments: { ...RICH_NUTRIENTS },
+    }),
+  });
+  const res = await handleProduct(request("3017620422003"), deps);
+  const body = await res.json();
+  assertEquals("score" in body, false, "no score object → no meters");
+});
+
+Deno.test("fetchedAt is present and equals product.fetched_at (cache + fresh)", async () => {
+  // Cache hit.
+  const fetchedAt = new Date(NOW - 5 * DAY_MS).toISOString();
+  const row = cachedRow(fetchedAt);
+  const { deps: d1 } = makeDeps({ cached: row });
+  const b1 = await (await handleProduct(request("3017620422003"), d1)).json();
+  assertEquals(b1.fetchedAt, fetchedAt);
+
+  // Fresh path — stamped with now().
+  const { deps: d2 } = makeDeps({ cached: null, off: offProduct() });
+  const b2 = await (await handleProduct(request("3017620422003"), d2)).json();
+  assertEquals(b2.fetchedAt, new Date(NOW).toISOString());
 });
