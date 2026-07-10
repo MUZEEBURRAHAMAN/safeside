@@ -207,6 +207,19 @@ final class PantryService {
         }
     }
 
+    /// Save a product we know only by its id (e.g. a Swaps candidate) to the
+    /// pantry as `scanned`, reusing the exact same upsert path as
+    /// `save(product:)` without needing a full `Product`. Preserves an existing
+    /// favorite. Fire-and-forget: the caller never blocks on the write.
+    func saveToPantry(productID: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            let status: PantryStatus = self.isFavorite(productID) ? .favorited : .scanned
+            _ = await self.upsertStatus(productID: productID, status: status)
+            await self.loadRecent()
+        }
+    }
+
     /// Flips a product between `favorited` and not — the contract other
     /// views (ProductView) call verbatim. Works for products already in the
     /// pantry (flips back to `scanned`) and for products the user has never

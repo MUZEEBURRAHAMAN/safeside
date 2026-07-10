@@ -17,8 +17,21 @@ struct ScoreBadge: View {
     /// Scales gently with Dynamic Type (§7 "reflow, no clip") rather than
     /// clipping the inner number — the ring grows instead. `relativeTo`
     /// `.title2` keeps growth proportionate to the adjacent product title.
-    @ScaledMetric(relativeTo: .title2) private var diameter: CGFloat = 108
-    @ScaledMetric(relativeTo: .title2) private var lineWidth: CGFloat = 9
+    /// Backed by the base values passed to `init` so the Swaps sheet can reuse
+    /// the exact same ring treatment at a compact 52 pt (never a color-only
+    /// mini badge — the number + word + arc all shrink together).
+    @ScaledMetric private var diameter: CGFloat
+    @ScaledMetric private var lineWidth: CGFloat
+
+    /// `diameter` 108 / `lineWidth` 9 are the Result-screen defaults (existing
+    /// call sites unchanged); the Swaps cards pass 52 / 5 for the mini ring.
+    init(score: Int?, band: ScoreBand, diameter baseDiameter: CGFloat = 108,
+         lineWidth baseLineWidth: CGFloat = 9) {
+        self.score = score
+        self.band = band
+        _diameter = ScaledMetric(wrappedValue: baseDiameter, relativeTo: .title2)
+        _lineWidth = ScaledMetric(wrappedValue: baseLineWidth, relativeTo: .title2)
+    }
 
     private var color: Color {
         switch band {
@@ -100,4 +113,14 @@ struct ScoreBadge: View {
         .padding()
         .background(Theme.canvas)
         .dynamicTypeSize(.accessibility3)
+}
+
+#Preview("Score ring — compact (Swaps mini ring)") {
+    HStack(spacing: 16) {
+        ScoreBadge(score: 78, band: .high, diameter: 52, lineWidth: 5)
+        ScoreBadge(score: 62, band: .mid, diameter: 52, lineWidth: 5)
+        ScoreBadge(score: 29, band: .low, diameter: 52, lineWidth: 5)
+    }
+    .padding()
+    .background(Theme.canvas)
 }

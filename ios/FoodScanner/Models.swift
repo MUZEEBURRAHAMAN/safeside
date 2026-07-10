@@ -131,3 +131,35 @@ struct Product: Codable, Identifiable {
     /// reads and pre-Chunk-1 responses.
     var fetchedAt: String? = nil
 }
+
+/// One ranked better option in the Swaps sheet (`GET swaps/product/:id/swaps`).
+/// Every field is backend-owned: `delta` and the `whyBetter` facts are
+/// deterministic diffs of stored DB values computed server-side (CLAUDE.md #5 —
+/// the LLM never does the math; principle #1 — every fact is sourced). The
+/// client renders these verbatim and performs ZERO score arithmetic.
+struct SwapCandidate: Codable, Identifiable {
+    let id: String
+    /// Routes the "View" tap through `ProductLoaderView(barcode:)` — the same
+    /// scored `/product/:barcode` path a scan uses. Optional for safety; in
+    /// practice a category candidate always has one.
+    let barcode: String?
+    let name: String
+    let brand: String?
+    let imageURL: String?
+    let score: Int
+    let band: ScoreBand
+    let delta: Int                 // score − subjectScore, always > 0 here
+    let inPantry: Bool
+    let whyBetter: [String]        // 0–3 sourced facts, e.g. ["No colours E150d"]
+}
+
+/// `GET swaps/product/:id/swaps` response. `thin` (fewer than a strong number
+/// of matches) drives the honest empty/near-miss note — never a dead-end
+/// (principle #4). `filteredForAllergies` surfaces the calm restriction note.
+struct SwapsResponse: Codable {
+    let category: String?
+    let subjectScore: Int
+    let filteredForAllergies: Bool
+    let swaps: [SwapCandidate]
+    let thin: Bool
+}

@@ -135,7 +135,7 @@ struct ProductView: View {
             }
         }
         .sheet(isPresented: $showBetterOptionSheet) {
-            NextActionSheet(band: band) {
+            SwapsView(product: workingProduct) {
                 showBetterOptionSheet = false
                 dismiss()
             }
@@ -207,9 +207,9 @@ struct ProductView: View {
                 // next-action below.
                 askAboutProductButton
 
-                // Next action — never a dead-end. The swaps engine isn't
-                // built yet (Phase 3), so this opens a calm sheet with a
-                // real, generic next step instead of a fabricated swap.
+                // Next action — never a dead-end (principle #4). Opens the
+                // Swaps sheet: a ranked, restriction-safe, sourced better option
+                // in the same category, or an honest empty state (SwapsView).
                 NextActionButton("See a better option", systemImage: "arrow.triangle.2.circlepath") {
                     showBetterOptionSheet = true
                 }

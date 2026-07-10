@@ -21,6 +21,7 @@ function offProduct(overrides: Partial<OffProduct> = {}): OffProduct {
     nutriscoreGrade: "e",
     additivesTags: [],
     allergensTags: [],
+    categoriesTags: [],
     ingredientsText: null,
     imageUrl: "https://images.openfoodfacts.org/front.jpg",
     servingSize: null,

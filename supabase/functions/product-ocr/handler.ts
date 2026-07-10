@@ -234,6 +234,8 @@ export async function handleOcr(req: Request, deps: Deps): Promise<Response> {
     serving_size: null,
     additives_tags: parsed.additivesTags,
     allergens_tags: parsed.allergens,
+    // OCR products have no OFF category; swaps can't group them (honest empty).
+    categories_tags: [],
     ingredients_text: parsed.ingredients.join(", ") || null,
     images: null,
     data_confidence: "limited",

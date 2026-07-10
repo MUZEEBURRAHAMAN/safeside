@@ -199,6 +199,41 @@ Deno.test("mapOffFields maps a raw product + explicit code to the internal shape
   assertEquals(mapped.nutriments["sugars_100g"], 56.3);
 });
 
+Deno.test("mapOffFields maps categories_tags to categoriesTags (Chunk 3)", () => {
+  const mapped = mapOffFields(
+    { product_name: "X", categories_tags: ["en:breakfasts", "en:chocolate-spreads"] },
+    "1234567890123",
+  );
+  assertEquals(mapped.categoriesTags, ["en:breakfasts", "en:chocolate-spreads"]);
+});
+
+Deno.test("mapOffFields defaults categoriesTags to [] when missing/non-array/dirty", () => {
+  assertEquals(mapOffFields({ product_name: "X" }, "1").categoriesTags, []);
+  assertEquals(
+    mapOffFields({ product_name: "X", categories_tags: "en:not-an-array" }, "1")
+      .categoriesTags,
+    [],
+  );
+  // Non-string entries are filtered out.
+  assertEquals(
+    mapOffFields(
+      { product_name: "X", categories_tags: ["en:snacks", 42, null] },
+      "1",
+    ).categoriesTags,
+    ["en:snacks"],
+  );
+});
+
+Deno.test("mapOffPayload carries categoriesTags through the by-barcode path", () => {
+  const mapped = mapOffPayload({
+    code: "3017620422003",
+    status: 1,
+    product: { product_name: "Nutella", categories_tags: ["en:chocolate-spreads"] },
+  });
+  if (mapped === null) throw new Error("expected a product");
+  assertEquals(mapped.categoriesTags, ["en:chocolate-spreads"]);
+});
+
 Deno.test("mapOffSearchPayload maps a products[] array to OffProducts", () => {
   const payload = {
     count: 2,

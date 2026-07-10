@@ -51,6 +51,7 @@ export interface ProductRow {
   serving_size: string | null;
   additives_tags: string[];
   allergens_tags: string[];
+  categories_tags: string[];
   ingredients_text: string | null;
   images: { front?: string | null } | null;
   data_confidence: "high" | "limited";
@@ -362,6 +363,7 @@ export async function handleProduct(
     serving_size: off.servingSize,
     additives_tags: off.additivesTags,
     allergens_tags: off.allergensTags,
+    categories_tags: off.categoriesTags,
     ingredients_text: off.ingredientsText,
     images: off.imageUrl ? { front: off.imageUrl } : null,
     data_confidence: scoreOutput.confidence,

@@ -1654,76 +1654,6 @@ struct NextActionButton: View {
     }
 }
 
-/// The sheet behind "See a better option" (§5.8 bottom sheets, `radius.lg`
-/// top). The real swaps engine is Phase 3 — this deliberately does NOT
-/// fabricate a specific alternative product. Instead it's honest about that,
-/// gives one concrete band-relevant habit, and offers the one truthful next
-/// action available today: scan something else to compare.
-struct NextActionSheet: View {
-    let band: ScoreBand
-    let onScanAnother: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    private var tip: String {
-        switch band {
-        case .low:
-            return "Products with a shorter ingredient list and less added sugar often score higher on processing and nutrition. Comparing two similar items side by side next time you shop is a simple way to find one that scores better."
-        case .mid:
-            return "This one's in the middle of the range. Comparing it against a similar product with fewer additives or less added sugar can sometimes turn up one that scores a bit higher."
-        case .high:
-            return "This one already scores well. If you're deciding between a few options, scanning each is the fastest way to compare them directly."
-        case .unknown:
-            return "We don't have enough data yet to say anything specific about this product. Scanning a different product — or one with a clearer ingredients label — is the best next step."
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                    VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                        Text("Not a personalized swap — yet")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("Suggesting a specific better product is a feature we haven't built yet, so we won't make one up. Here's something real you can do instead:")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-
-                    SectionCard {
-                        Text(tip)
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Button(action: onScanAnother) {
-                        HStack(spacing: Theme.Space.s2) {
-                            Image(systemName: "barcode.viewfinder")
-                            Text("Scan another product").font(.body.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .foregroundStyle(Theme.onGreen)
-                    .background(Theme.greenDeep, in: Capsule())
-                }
-                .padding(Theme.Space.s4)
-            }
-            .background(Theme.canvas)
-            .navigationTitle("See a better option")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-}
-
 // MARK: - Attribution
 
 struct AttributionFooter: View {
@@ -1873,13 +1803,6 @@ struct ResultSkeletonView: View {
         .padding()
     }
     .background(Theme.canvas)
-}
-
-#Preview("Next action sheet — low band") {
-    Color.clear
-        .sheet(isPresented: .constant(true)) {
-            NextActionSheet(band: .low, onScanAnother: {})
-        }
 }
 
 #Preview("Methodology sheet") {

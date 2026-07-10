@@ -168,6 +168,15 @@ struct APIClient {
         try await request("product/\(productID)/ingredients")
     }
 
+    /// Ranked, restriction-safe better options in the same category
+    /// (GET swaps/product/:id/swaps). The ranking and every "why better" fact
+    /// are deterministic, sourced diffs of DB fields computed server-side — the
+    /// LLM never runs here (CLAUDE.md #5). Allergen filtering runs against the
+    /// caller's own profile under RLS.
+    func swaps(productID: String) async throws -> SwapsResponse {
+        try await request("swaps/product/\(productID)/swaps")
+    }
+
     /// Label OCR fallback when a barcode isn't in the DB.
     func analyzeLabel(text: String) async throws -> Product {
         let body = try JSONEncoder().encode(["text": text])

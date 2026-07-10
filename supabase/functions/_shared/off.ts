@@ -26,6 +26,7 @@ export const OFF_FIELDS = [
   "nutriscore_grade",
   "additives_tags",
   "allergens_tags",
+  "categories_tags",
   "ingredients_text",
   "ingredients",
   "image_front_url",
@@ -42,6 +43,7 @@ export interface OffProduct {
   nutriscoreGrade: string | null; // "a"–"e" or null
   additivesTags: string[]; // e.g. ["en:e330", "en:e250"]
   allergensTags: string[]; // e.g. ["en:milk"]
+  categoriesTags: string[]; // e.g. ["en:chocolate-spreads"] — Swaps grouping (Chunk 3)
   ingredientsText: string | null;
   imageUrl: string | null;
   servingSize: string | null;
@@ -95,6 +97,9 @@ export function mapOffFields(
       : [],
     allergensTags: Array.isArray(p.allergens_tags)
       ? p.allergens_tags.filter((t): t is string => typeof t === "string")
+      : [],
+    categoriesTags: Array.isArray(p.categories_tags)
+      ? p.categories_tags.filter((t): t is string => typeof t === "string")
       : [],
     ingredientsText: asNonEmptyString(p.ingredients_text),
     imageUrl: asNonEmptyString(p.image_front_url),

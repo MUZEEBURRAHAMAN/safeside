@@ -136,6 +136,7 @@
 - Pantry-match chip: "In your pantry"
 - Empty (honest): "Few close matches in this category yet. Here's the nearest — or scan another to compare." [Scan another]
 - Restriction note: "Filtered for your allergies." (shown when profile filters applied)
+- Error: "Couldn't load better options. Check your connection and try again." [Retry]
 
 ### Compare (Chunk 5)
 - Entry action: "Compare"
