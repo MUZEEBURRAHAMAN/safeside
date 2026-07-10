@@ -89,6 +89,11 @@ final class SearchViewModel {
 /// barcode takes the identical scored path as a live scan; a name hits our
 /// `/search` edge function, which attaches ONLY our own cached score (never
 /// Open Food Facts' Nutri-Score — transparency).
+// TODO(chunk-5 follow-up): Search multi-select → CompareView (SCREEN_SPECS §10
+// second entry point). Add a "Compare" mode that lets the user tick exactly two
+// result rows, then push `CompareView(pair:)`. Deferred from Chunk 5 to keep
+// that chunk's scope minimal — the Result-overflow entry (ProductView) ships
+// the primary Compare entry. See MEMORY.md (Chunk 5).
 struct SearchView: View {
     var startInBarcodeMode: Bool = false
 

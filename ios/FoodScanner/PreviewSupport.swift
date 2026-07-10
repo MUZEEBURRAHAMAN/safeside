@@ -98,5 +98,78 @@ extension Product {
         dataConfidence: "limited",
         fetchedAt: "2026-07-08T12:00:00Z"
     )
+
+    /// A clearly higher-scoring second product, so Compare (Chunk 5) previews
+    /// and the screenshot matrix show a real two-column contrast with an
+    /// unambiguous overall winner. Every factor is higher than `sampleScored`'s.
+    static let sampleScoredHigh = Product(
+        id: "sample-2",
+        barcode: "3017620422003",
+        name: "Lightly Salted Rice Cakes",
+        brand: "Kallø",
+        imageURL: "https://images.openfoodfacts.org/images/products/000/000/000/0001/front_en.400.jpg",
+        score: ScoreResult(
+            score: 78,
+            band: .high,
+            confidence: "high",
+            factors: [
+                ScoreFactor(
+                    name: "Nutrition",
+                    subScore: 72,
+                    weight: 0.35,
+                    detail: "Nutri-Score B maps to 72 out of 100 in our nutrient model.",
+                    sources: [Source(name: "Nutri-Score nutrient model (via Open Food Facts)",
+                                     url: "https://world.openfoodfacts.org/nutriscore")]
+                ),
+                ScoreFactor(
+                    name: "Additives",
+                    subScore: 100,
+                    weight: 0.15,
+                    detail: "No additives of concern detected.",
+                    sources: [Source(name: "Curated additive review table v1.0 (EFSA / FDA / JECFA)", url: nil)]
+                ),
+                ScoreFactor(
+                    name: "Processing",
+                    subScore: 80,
+                    weight: 0.50,
+                    detail: "NOVA 2 (processed culinary ingredient) maps to 80 out of 100.",
+                    sources: [Source(name: "NOVA classification (via Open Food Facts)",
+                                     url: "https://world.openfoodfacts.org")]
+                ),
+            ],
+            scoreVersion: "1.0.0",
+            highlights: NutrientHighlights(
+                watchOuts: [
+                    MeterRow(label: "Salt", value: 0.5, unit: "g", tier: "low",
+                             meterFraction: 0.33, kind: "watchOut",
+                             sources: [Source(name: "FSA nutrient thresholds (via Open Food Facts)", url: nil)]),
+                ],
+                benefits: [
+                    MeterRow(label: "Fiber", value: 4.2, unit: "g", tier: "good source",
+                             meterFraction: 0.7, kind: "benefit",
+                             sources: [Source(name: "Nutri-Score nutrient model (via Open Food Facts)", url: nil)]),
+                ],
+                toKnowAboutCount: 0,
+                beneficialCount: 1
+            )
+        ),
+        ingredients: [
+            Ingredient(
+                name: "Wholegrain rice",
+                what: "A whole-grain cereal; the base of the cake.",
+                whyUsed: "Forms the body and texture of the cake.",
+                safety: "A common staple food, considered safe.",
+                riskTier: "low",
+                whoShouldAvoid: [],
+                misconceptions: [],
+                foundIn: ["snacks", "cereals"],
+                sources: [Source(name: "USDA FoodData Central", url: "https://fdc.nal.usda.gov/")],
+                confidence: "high"
+            ),
+        ],
+        allergens: [],
+        dataConfidence: "high",
+        fetchedAt: "2026-07-09T09:00:00Z"
+    )
 }
 #endif

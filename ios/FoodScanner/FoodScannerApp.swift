@@ -37,6 +37,14 @@ struct FoodScannerApp: App {
                 harness { OnboardingView {} }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "scan" {
                 harness { NavigationStack { ScanScreen() } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "compare" {
+                // Compare v1 (Chunk 5) with two full sample products so the
+                // screenshot matrix shows a real two-column contrast.
+                harness {
+                    NavigationStack {
+                        CompareView(a: .sampleScored, b: .sampleScoredHigh)
+                    }
+                }
             } else {
                 appBody
             }

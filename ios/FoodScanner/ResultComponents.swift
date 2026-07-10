@@ -247,14 +247,7 @@ private struct TriMetricTile: View {
 
     private var subBand: ScoreBand { ScoreBand.from(score: factor.subScore) }
 
-    private var tint: Color {
-        switch subBand {
-        case .high: return Theme.scoreHigh
-        case .mid: return Theme.scoreMid
-        case .low: return Theme.scoreLow
-        case .unknown: return Theme.scoreUnknown
-        }
-    }
+    private var tint: Color { subBand.tint }
 
     /// Short, calm, non-alarmist qualitative word — deliberately distinct
     /// from `ScoreBand.label` (which is a full-sentence overall verdict);
@@ -316,14 +309,7 @@ struct ScoreFactorRow: View {
 
     private var subBand: ScoreBand { ScoreBand.from(score: factor.subScore) }
 
-    private var barColor: Color {
-        switch subBand {
-        case .high: return Theme.scoreHigh
-        case .mid: return Theme.scoreMid
-        case .low: return Theme.scoreLow
-        case .unknown: return Theme.scoreUnknown
-        }
-    }
+    private var barColor: Color { subBand.tint }
 
     private var icon: String {
         let n = factor.name.lowercased()
@@ -1202,6 +1188,92 @@ struct MetersSection: View {
         }
     }
 }
+
+// MARK: - Shared-scale score meter — Chunk 5 (Compare)
+
+/// A single labelled bar on a fixed 0–100 shared scale (teardown STEAL #5/#8),
+/// driven by a backend-computed score `value` + its `band`. Distinct from
+/// `MeterRowView`: that one renders a nutrient `MeterRow` (value/unit/tier,
+/// tier-based tint, tap-for-sources); this one renders a 0–100 *score* (Int)
+/// with a band tint, for Compare's aligned two-side rows. Both share the single
+/// `ScoreBand.tint` colour source. The value is never derived here — only the
+/// bar length (value/100) is drawn.
+///
+/// `emphasized` draws the subtle winner wash for Compare — OFF by default, and
+/// it uses THIS value's own band colour (never alarm-red, never green under a
+/// low band; AVOID #1/#5). The wash is a background bleed only, so it never
+/// changes the bar's width — equal values always draw equal-length bars.
+/// `.accessibilityHidden(true)`: the enclosing Compare row owns the a11y label.
+struct SharedScaleMeter: View {
+    let value: Int?              // 0–100, nil = unscored (dashed empty track)
+    let band: ScoreBand
+    var trailingText: String? = nil   // e.g. "51/100" or "—"
+    var emphasized: Bool = false
+
+    @ScaledMetric(relativeTo: .footnote) private var barHeight: CGFloat = 10
+
+    /// Bar length as a 0…1 fraction. A tiny floor keeps a visible sliver even
+    /// at score 0 (mirrors `ScoreBadge`'s min-trim), so the bar is never a
+    /// mystery empty track when the product *is* scored.
+    private var fraction: CGFloat {
+        guard let value else { return 0 }
+        return max(CGFloat(min(max(value, 0), 100)) / 100, 0.02)
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s3) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Theme.surfaceAlt)
+                        .overlay {
+                            if value == nil {
+                                Capsule().strokeBorder(
+                                    Theme.border,
+                                    style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                                )
+                            }
+                        }
+                    if value != nil {
+                        Capsule()
+                            .fill(band.tint)
+                            .frame(width: geo.size.width * fraction)
+                    }
+                }
+            }
+            .frame(height: barHeight)
+
+            if let trailingText {
+                Text(trailingText)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .background {
+            if emphasized {
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(band.tint.opacity(0.12))
+                    .padding(.horizontal, -Theme.Space.s2)
+                    .padding(.vertical, -Theme.Space.s1)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+#if DEBUG
+#Preview("SharedScaleMeter — bands + emphasis") {
+    VStack(spacing: Theme.Space.s4) {
+        SharedScaleMeter(value: 88, band: .high, trailingText: "88/100")
+        SharedScaleMeter(value: 51, band: .mid, trailingText: "51/100", emphasized: true)
+        SharedScaleMeter(value: 27, band: .low, trailingText: "27/100")
+        SharedScaleMeter(value: nil, band: .unknown, trailingText: "—")
+    }
+    .padding()
+    .background(Theme.canvas)
+}
+#endif
 
 // MARK: - Ingredient pre-read + additive summary — Chunk 1
 

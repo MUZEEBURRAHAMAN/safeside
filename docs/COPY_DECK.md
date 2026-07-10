@@ -144,6 +144,7 @@
 - Winner tint label (a11y): "{Product} scores higher on {metric}"
 - CTA: "Pick this one" → "Saved to pantry."
 - Compact toggle labels: product names (truncate at 18 chars + ellipsis)
+- Compact per-row winner chip: "Higher" (neutral; marks the shown side's own strength on that metric — never a "loser" label on the other side)
 
 ### Offline & limits (Chunks 4/6)
 - Offline scan attempt: "You're offline. Scanning needs a connection — your pantry still works."

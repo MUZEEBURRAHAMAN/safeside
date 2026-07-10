@@ -40,6 +40,12 @@ struct ProductView: View {
     @State private var showReportIssueSheet = false
     @State private var showChat = false
 
+    /// Compare (Chunk 5): the partner-picker sheet, and the chosen partner that
+    /// pushes `CompareView`. `navigationDestination(item:)` clears it on pop.
+    /// `Product` isn't `Hashable`, so the pushed value is a light id-keyed box.
+    @State private var showComparePicker = false
+    @State private var comparePartner: ComparePartnerRoute?
+
     /// Chunk 2 (Search / deep-link) will flip this on to construct `ProductView`
     /// before the product resolves, showing `ResultSkeletonView`. Today the
     /// caller always passes a fully-fetched `Product`, so this stays false and
@@ -133,6 +139,19 @@ struct ProductView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 favoriteButton
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                overflowMenu
+            }
+        }
+        .sheet(isPresented: $showComparePicker) {
+            ComparePartnerPicker(excludingID: workingProduct.id) { partner in
+                showComparePicker = false
+                comparePartner = ComparePartnerRoute(product: partner)
+            }
+            .environment(pantryService)
+        }
+        .navigationDestination(item: $comparePartner) { route in
+            CompareView(pair: ComparePair(a: workingProduct, b: route.product))
         }
         .sheet(isPresented: $showBetterOptionSheet) {
             SwapsView(product: workingProduct) {
@@ -305,6 +324,24 @@ struct ProductView: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+    }
+
+    /// Overflow menu — currently the Compare entry (SCREEN_SPECS §10). Kept as
+    /// its own 44 pt target beside the heart so both stay reachable.
+    private var overflowMenu: some View {
+        Menu {
+            Button {
+                showComparePicker = true
+            } label: {
+                Label("Compare", systemImage: "square.split.2x1")
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.greenDeep)
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("More")
     }
 
     /// Entry point into `ChatView` — a grounded chat scoped to this one
@@ -495,6 +532,95 @@ struct ProductView: View {
         } else {
             withAnimation(Motion.reveal) { identityVisible = true }
         }
+    }
+}
+
+// MARK: - Compare partner picker (Chunk 5)
+
+/// Id-keyed navigation box so a chosen partner `Product` (not `Hashable`) can
+/// drive `navigationDestination(item:)`. Identity is the product id.
+private struct ComparePartnerRoute: Hashable, Identifiable {
+    let product: Product
+    var id: String { product.id }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+/// A small sheet to pick which already-scanned product to compare against.
+/// Lists the pantry's recent scans (each already scored) minus the current
+/// product; never a dead-end — an empty pantry shows the calm scan prompt.
+private struct ComparePartnerPicker: View {
+    let excludingID: String
+    let onPick: (Product) -> Void
+
+    @Environment(PantryService.self) private var pantryService
+    @Environment(\.dismiss) private var dismiss
+
+    private var candidates: [Product] {
+        pantryService.entries
+            .map { $0.asProduct() }
+            .filter { $0.id != excludingID }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if candidates.isEmpty {
+                    Text("Your pantry's empty. Scan your first product to start.")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, Theme.Space.s7)
+                        .padding(.horizontal, Theme.Space.s4)
+                } else {
+                    VStack(spacing: Theme.Space.s3) {
+                        ForEach(candidates) { product in
+                            Button { onPick(product) } label: {
+                                partnerRow(product)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(Theme.Space.s4)
+                }
+            }
+            .background(Theme.canvas)
+            .navigationTitle("Compare")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") { dismiss() }
+                        .foregroundStyle(Theme.greenDeep)
+                }
+            }
+        }
+    }
+
+    private func partnerRow(_ product: Product) -> some View {
+        HStack(spacing: Theme.Space.s3) {
+            FloatingProductImage(urlString: product.imageURL, size: 52)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(product.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                if let brand = product.brand, !brand.isEmpty {
+                    Text(brand)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: Theme.Space.s2)
+            ScoreBadge(score: product.score?.score,
+                       band: product.score?.band ?? .unknown,
+                       diameter: 44, lineWidth: 4)
+        }
+        .padding(Theme.Space.s3)
+        .surfaceCard(padded: false)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 

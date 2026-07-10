@@ -33,14 +33,7 @@ struct ScoreBadge: View {
         _lineWidth = ScaledMetric(wrappedValue: baseLineWidth, relativeTo: .title2)
     }
 
-    private var color: Color {
-        switch band {
-        case .high: return Theme.scoreHigh
-        case .mid: return Theme.scoreMid
-        case .low: return Theme.scoreLow
-        case .unknown: return Theme.scoreUnknown
-        }
-    }
+    private var color: Color { band.tint }
 
     private var progress: CGFloat {
         guard let score else { return 0 }

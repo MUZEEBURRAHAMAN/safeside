@@ -38,6 +38,22 @@ enum Theme {
                   full: CGFloat = 999 }
 }
 
+extension ScoreBand {
+    /// The single band → token colour source (DESIGN_SYSTEM_V3 score scale).
+    /// Non-alarmist by design: `.low` is clay, never alarm red (CLAUDE.md
+    /// ED-safe rule). Adopted by `ScoreBadge`, `TriMetricTile`,
+    /// `ScoreFactorRow`, and `SharedScaleMeter` so this mapping lives in
+    /// exactly one place instead of being copied per view.
+    var tint: Color {
+        switch self {
+        case .high:    return Theme.scoreHigh
+        case .mid:     return Theme.scoreMid
+        case .low:     return Theme.scoreLow
+        case .unknown: return Theme.scoreUnknown
+        }
+    }
+}
+
 extension Color {
     init(hex: UInt, alpha: Double = 1) {
         self.init(.sRGB,
