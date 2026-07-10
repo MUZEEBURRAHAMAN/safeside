@@ -13,8 +13,12 @@ const OFF_BASE_URL = "https://world.openfoodfacts.org/api/v2/product";
 
 /** OFF v2 name-search endpoint (Chunk 2). Kept general so Chunk 3 (Swaps)
  * can reuse the same search/category plumbing. */
+// OFF's legacy /api/v2/search and /cgi/search.pl are heavily throttled and
+// return an HTML "temporarily unavailable" interstitial for automated queries.
+// Their current dedicated search service (search-a-licious) returns clean JSON
+// (`{ hits: [...] }`) and is what powers the OFF website search today.
 export const OFF_SEARCH_BASE_URL =
-  "https://world.openfoodfacts.org/api/v2/search";
+  "https://search.openfoodfacts.org/search";
 
 export const OFF_USER_AGENT = "FoodScannerApp/0.1 (dev; muzeeb@omnisai.io)";
 
@@ -157,6 +161,53 @@ export function mapOffSearchPayload(payload: unknown): OffProduct[] {
 }
 
 /**
+ * Normalize a search-a-licious hit's field vocabulary to the OFF product-API
+ * names `mapOffFields` expects, so both search paths share one mapper.
+ * SAL differs: `brands`/`categories_tags` are arrays, NOVA is `nova_groups`
+ * (string), the grade is `nutrition_grades`, and many hits omit `product_name`.
+ */
+function normalizeSalHit(p: Record<string, unknown>): Record<string, unknown> {
+  const brandsArr = Array.isArray(p.brands)
+    ? p.brands.filter((b): b is string => typeof b === "string")
+    : [];
+  const brands = brandsArr.length > 0 ? brandsArr.join(", ") : p.brands;
+
+  const productName = asNonEmptyString(p.product_name) ??
+    asNonEmptyString(p.product_name_en) ??
+    (brandsArr.length > 0 ? brandsArr[0] : undefined);
+
+  return {
+    ...p,
+    product_name: productName,
+    brands,
+    nova_group: p.nova_group ?? p.nova_groups,
+    nutriscore_grade: p.nutriscore_grade ?? p.nutrition_grades,
+    image_front_url: p.image_front_url ?? p.image_url,
+  };
+}
+
+/**
+ * Map a search-a-licious response body (`{ hits: [...] }`) to our internal
+ * shape. Each hit carries its own `code`. Items with a blank/missing barcode
+ * are dropped. Returns [] for an empty/malformed body. Kept general so Swaps
+ * can reuse the same search/category plumbing.
+ */
+export function mapSalSearchPayload(payload: unknown): OffProduct[] {
+  const hits = (payload as { hits?: unknown } | null)?.hits;
+  if (!Array.isArray(hits)) return [];
+
+  const out: OffProduct[] = [];
+  for (const item of hits) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const code = asNonEmptyString(p.code);
+    if (code === null) continue; // no barcode → useless row
+    out.push(mapOffFields(normalizeSalHit(p), code));
+  }
+  return out;
+}
+
+/**
  * Fetch a product from OFF by barcode.
  * Returns null when the product is not found (OFF status 0 or HTTP 404).
  * Throws on other transport/HTTP failures so callers can surface a 502.
@@ -200,9 +251,10 @@ export async function fetchOffSearch(
 ): Promise<OffProduct[]> {
   // encodeURIComponent (not URLSearchParams, which would encode spaces as "+")
   // so the query is percent-encoded exactly (matches the plan + fetchProduct).
-  const url = `${OFF_SEARCH_BASE_URL}?search_terms=${
+  // search-a-licious: `?q=` free-text, `page_size` cap. Returns `{ hits: [...] }`.
+  const url = `${OFF_SEARCH_BASE_URL}?q=${
     encodeURIComponent(query)
-  }&fields=${OFF_FIELDS},code&page_size=20&sort_by=unique_scans_n`;
+  }&page_size=20`;
 
   const res = await fetchImpl(url, {
     headers: {
@@ -215,5 +267,5 @@ export async function fetchOffSearch(
     throw new Error(`Open Food Facts search failed: HTTP ${res.status}`);
   }
 
-  return mapOffSearchPayload(await res.json());
+  return mapSalSearchPayload(await res.json());
 }

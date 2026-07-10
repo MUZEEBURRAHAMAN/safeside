@@ -10,6 +10,7 @@ import {
   mapOffFields,
   mapOffPayload,
   mapOffSearchPayload,
+  mapSalSearchPayload,
   OFF_USER_AGENT,
 } from "./off.ts";
 
@@ -270,7 +271,7 @@ Deno.test("mapOffSearchPayload returns [] for empty/malformed bodies", () => {
   assertEquals(mapOffSearchPayload({ products: "nope" }), []);
 });
 
-Deno.test("fetchOffSearch builds the v2 search URL and returns mapped results", async () => {
+Deno.test("fetchOffSearch builds the search-a-licious URL and returns mapped results", async () => {
   let capturedUrl = "";
   let capturedUserAgent: string | null = null;
 
@@ -284,8 +285,8 @@ Deno.test("fetchOffSearch builds the v2 search URL and returns mapped results", 
       new Response(
         JSON.stringify({
           count: 1,
-          products: [
-            { code: "3017620422003", product_name: "Nutella", brands: "Ferrero" },
+          hits: [
+            { code: "3017620422003", brands: ["Ferrero"], product_name: "Nutella" },
           ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -296,16 +297,11 @@ Deno.test("fetchOffSearch builds the v2 search URL and returns mapped results", 
   const results = await fetchOffSearch("nutella", fakeFetch);
   assertEquals(results.length, 1);
   assertEquals(results[0].name, "Nutella");
+  assertEquals(results[0].brand, "Ferrero");
   assertEquals(capturedUserAgent, OFF_USER_AGENT);
-  assertStringIncludes(
-    capturedUrl,
-    "https://world.openfoodfacts.org/api/v2/search",
-  );
-  assertStringIncludes(capturedUrl, "search_terms=nutella");
-  assertStringIncludes(capturedUrl, "fields=");
-  assertStringIncludes(capturedUrl, "code");
+  assertStringIncludes(capturedUrl, "https://search.openfoodfacts.org/search");
+  assertStringIncludes(capturedUrl, "q=nutella");
   assertStringIncludes(capturedUrl, "page_size=20");
-  assertStringIncludes(capturedUrl, "sort_by=unique_scans_n");
 });
 
 Deno.test("fetchOffSearch percent-encodes the query", async () => {
@@ -313,11 +309,43 @@ Deno.test("fetchOffSearch percent-encodes the query", async () => {
   const fakeFetch = (input: URL | RequestInfo): Promise<Response> => {
     capturedUrl = String(input);
     return Promise.resolve(
-      new Response(JSON.stringify({ products: [] }), { status: 200 }),
+      new Response(JSON.stringify({ hits: [] }), { status: 200 }),
     );
   };
   await fetchOffSearch("dark chocolate 70%", fakeFetch);
-  assertStringIncludes(capturedUrl, "search_terms=dark%20chocolate%2070%25");
+  assertStringIncludes(capturedUrl, "q=dark%20chocolate%2070%25");
+});
+
+Deno.test("mapSalSearchPayload normalizes SAL hit vocab (arrays, nova_groups, nutrition_grades)", () => {
+  const payload = {
+    hits: [
+      {
+        code: "0009800800049",
+        brands: ["Nutella"],
+        categories_tags: ["en:snacks"],
+        nova_groups: "3",
+        nutrition_grades: "e",
+        additives_tags: ["en:e322"],
+      },
+      { code: "", brands: ["No barcode"] }, // dropped
+    ],
+  };
+  const mapped = mapSalSearchPayload(payload);
+  assertEquals(mapped.length, 1);
+  assertEquals(mapped[0].barcode, "0009800800049");
+  assertEquals(mapped[0].name, "Nutella"); // falls back to first brand
+  assertEquals(mapped[0].brand, "Nutella");
+  assertEquals(mapped[0].novaGroup, 3);
+  assertEquals(mapped[0].nutriscoreGrade, "e");
+  assertEquals(mapped[0].categoriesTags, ["en:snacks"]);
+  assertEquals(mapped[0].additivesTags, ["en:e322"]);
+});
+
+Deno.test("mapSalSearchPayload returns [] for empty/malformed bodies", () => {
+  assertEquals(mapSalSearchPayload({ hits: [] }), []);
+  assertEquals(mapSalSearchPayload({}), []);
+  assertEquals(mapSalSearchPayload(null), []);
+  assertEquals(mapSalSearchPayload({ hits: "nope" }), []);
 });
 
 Deno.test("fetchOffSearch throws on non-OK HTTP (caller maps to 502)", async () => {
