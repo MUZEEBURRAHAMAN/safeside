@@ -339,11 +339,17 @@ struct MeView: View {
                         activeSheet = .methodology
                     }
                     HairlineDivider()
-                    UtilityRow(title: "Privacy", systemImage: "hand.raised.fill") {
+                    // Deck row order (COPY_DECK §Legal & attribution):
+                    // Privacy policy · Terms of use · Data sources & attribution.
+                    UtilityRow(title: "Privacy policy", systemImage: "hand.raised.fill") {
                         activeSheet = .privacy
                     }
                     HairlineDivider()
-                    UtilityRow(title: "Data sources", systemImage: "leaf.fill") {
+                    UtilityRow(title: "Terms of use", systemImage: "doc.text.fill") {
+                        activeSheet = .terms
+                    }
+                    HairlineDivider()
+                    UtilityRow(title: "Data sources & attribution", systemImage: "leaf.fill") {
                         activeSheet = .dataSources
                     }
                 }
@@ -401,7 +407,7 @@ struct MeView: View {
     // to get synthesized conformance — required here since `id: Self`.
     private enum MeSheet: Identifiable, Hashable {
         case goal, dietPattern, allergies, dislikes, cookTime, budget, healthFlags
-        case methodology, privacy, dataSources
+        case methodology, privacy, terms, dataSources
         var id: Self { self }
     }
 
@@ -467,9 +473,11 @@ struct MeView: View {
         case .methodology:
             MethodologySheet()
         case .privacy:
-            PrivacySheet()
+            NavigationStack { PrivacyPolicyView() }
+        case .terms:
+            NavigationStack { TermsView() }
         case .dataSources:
-            DataSourcesSheet()
+            NavigationStack { AttributionView() }
         }
     }
 }
@@ -694,103 +702,6 @@ private struct MultiChoiceSheet: View {
         .frame(minHeight: 44)
         .contentShape(Rectangle())
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-// MARK: - About sheets
-
-/// Placeholder privacy explainer — honest about what's real today (no
-/// dedicated privacy-policy page shipped yet) rather than a canned legal
-/// wall of text, same "never fabricate a feature that isn't real" principle
-/// as `ReportIssueSheet` (ResultComponents.swift).
-private struct PrivacySheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                    Text("Your data, in plain terms")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("You can use this app as a guest — nothing is required to scan and see scores. What we store is used to run the app (your profile, scans, and any plans you build), and it's never sold. A full privacy policy is on its way; this screen will link to it once it ships.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    SectionCard {
-                        Text("Information only — not medical advice. Allergen data may be incomplete; check labels.")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(Theme.Space.s4)
-            }
-            .background(Theme.canvas)
-            .navigationTitle("Privacy")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
-    }
-}
-
-/// Data-source attribution — Open Food Facts is ODbL-licensed, which
-/// requires attribution and share-alike on the data (CLAUDE.md's tech
-/// direction note); this is that attribution, one tap away.
-private struct DataSourcesSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    private var openFoodFactsURL: URL? { URL(string: "https://world.openfoodfacts.org") }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                    Text("Where the data comes from")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-
-                    SectionCard {
-                        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-                            Text("Open Food Facts")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Theme.textPrimary)
-                            Text("Product names, ingredients, and nutrition come from Open Food Facts, a free, open, community-built database, used under the Open Database License (ODbL) — we attribute the data and share alike, as the license requires.")
-                                .font(.footnote)
-                                .foregroundStyle(Theme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if let openFoodFactsURL {
-                                Link("world.openfoodfacts.org", destination: openFoodFactsURL)
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Theme.greenDeep)
-                            }
-                        }
-                    }
-
-                    Text("Information only — not medical advice.")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                .padding(Theme.Space.s4)
-            }
-            .background(Theme.canvas)
-            .navigationTitle("Data sources")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
     }
 }
 

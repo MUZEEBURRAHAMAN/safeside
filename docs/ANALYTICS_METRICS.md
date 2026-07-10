@@ -39,10 +39,15 @@ Track conversion at each step; the biggest drop is the priority to fix.
 | ai_plan_requested / ai_plan_applied | latency_ms, edits_after |
 | shopping_list_generated | items, need_count |
 | paywall_viewed / trial_started / subscription_active / subscription_cancelled | plan, price |
-| data_reported | product_id |
+| data_reported | product_id, reason |
+| chat_opened | product_id |
+| feedback_sentiment | sentiment (not_great\|okay\|good\|great) |
+| app_review_requested | — |
 | score_hidden_toggled / calories_toggled | value |
 
 Rules: event names snake_case, stable; no PII in props; user_id is the Supabase id (pseudonymous).
+
+**Client implementation note (Chunk 7):** these canonical names are authoritative and are what `AnalyticsLogger.EventName` emits. The Chunk 7 plan used shorthand that maps onto them: `result_viewed`→`score_viewed`, `why_expanded`→`why_score_expanded`, `swap_viewed`→`swap_shown`, `swap_saved`→`swap_accepted`, `report_submitted`→`data_reported`. `chat_opened`, `feedback_sentiment`, and `app_review_requested` are new events appended here in Chunk 7. Free text (the sentiment gate's message) NEVER goes in `events.props` — it lands in the separate owner-only `app_feedback` table (migration `20260710120000`); the `AnalyticsValue` type makes non-scalar props structurally impossible. Events are inserted directly via PostgREST under the existing owner-only `events` INSERT RLS policy — there is no analytics edge function.
 
 ## 5. Trust & safety metrics (category-specific)
 - "Why this score" expand rate (do users engage with transparency?).

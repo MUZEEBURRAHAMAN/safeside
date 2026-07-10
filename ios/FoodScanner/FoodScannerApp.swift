@@ -9,6 +9,10 @@ struct FoodScannerApp: App {
     // Live connectivity signal for the calm offline banners (Chunk 6).
     @State private var networkMonitor = NetworkMonitor()
 
+    // Batched, best-effort analytics + the post-3rd-scan sentiment gate (Chunk 7).
+    @State private var analytics: AnalyticsLogger
+    @State private var feedbackGate: FeedbackGate
+
     // Onboarding is skippable and shown once — never gates scanning. Seeded
     // from UserDefaults so a fresh install (and only a fresh install) sees it.
     @State private var showOnboarding: Bool
@@ -18,6 +22,14 @@ struct FoodScannerApp: App {
         _session = State(initialValue: session)
         _pantryService = State(initialValue: PantryService(session: session))
         _profileService = State(initialValue: ProfileService(session: session))
+        // Events insert directly via PostgREST (owner-only RLS) — no edge fn.
+        // Stamp user_id from the live session at log time; the sink re-stamps
+        // at send time in case an event was buffered before sign-in resolved.
+        _analytics = State(initialValue: AnalyticsLogger(
+            sink: SupabaseEventSink(session: session),
+            userID: { session.userID }
+        ))
+        _feedbackGate = State(initialValue: FeedbackGate())
         _showOnboarding = State(initialValue: !UserDefaults.standard.bool(forKey: "hasOnboarded"))
     }
 
@@ -47,6 +59,21 @@ struct FoodScannerApp: App {
                         CompareView(a: .sampleScored, b: .sampleScoredHigh)
                     }
                 }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "feedback" {
+                // Chunk 7: the sentiment gate, presented over the Me tab so the
+                // screenshot matrix can capture it (it can't be reached mid-flow).
+                // The .sheet lives INSIDE the harness content so its FeedbackGate/
+                // AnalyticsLogger/SessionService environment is in scope.
+                harness {
+                    MeView()
+                        .sheet(isPresented: .constant(true)) { FeedbackGateSheet() }
+                }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "privacy" {
+                harness { NavigationStack { PrivacyPolicyView() } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "terms" {
+                harness { NavigationStack { TermsView() } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "attribution" {
+                harness { NavigationStack { AttributionView() } }
             } else {
                 appBody
             }
@@ -64,6 +91,8 @@ struct FoodScannerApp: App {
             .environment(pantryService)
             .environment(profileService)
             .environment(networkMonitor)
+            .environment(analytics)
+            .environment(feedbackGate)
             .tint(Theme.greenDeep)
     }
 #endif
@@ -74,6 +103,8 @@ struct FoodScannerApp: App {
                 .environment(pantryService)
                 .environment(profileService)
                 .environment(networkMonitor)
+                .environment(analytics)
+                .environment(feedbackGate)
                 .tint(Theme.greenDeep)
                 .fullScreenCover(isPresented: $showOnboarding) {
                     OnboardingView {
@@ -87,7 +118,13 @@ struct FoodScannerApp: App {
 
 /// 4-tab shell (docs/DESIGN_SYSTEM §5.7). Scan is the primary action.
 struct RootTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(AnalyticsLogger.self) private var analytics
+    @Environment(FeedbackGate.self) private var feedbackGate
+
     var body: some View {
+        // @Bindable so the sentiment gate's `shouldPrompt` can drive a sheet.
+        @Bindable var gate = feedbackGate
         TabView {
             HomeView()
                 .tabItem { Label("Home", systemImage: "house") }
@@ -101,6 +138,17 @@ struct RootTabView: View {
 
             MeView()
                 .tabItem { Label("Me", systemImage: "person") }
+        }
+        // Presented from the tab shell (never the onboarding fullScreenCover),
+        // so the gate structurally cannot appear mid-onboarding.
+        .sheet(isPresented: $gate.shouldPrompt) {
+            FeedbackGateSheet()
+        }
+        // Best-effort delivery before the app suspends.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                Task { await analytics.flush() }
+            }
         }
     }
 }

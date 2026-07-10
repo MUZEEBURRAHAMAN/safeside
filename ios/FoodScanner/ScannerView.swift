@@ -618,11 +618,16 @@ final class ScanViewModel {
 
     @MainActor
     func handle(barcode: String, api: APIClient, pantryService: PantryService,
-                captureHandle: ScannerCaptureBridge) async {
+                captureHandle: ScannerCaptureBridge,
+                analytics: AnalyticsLogger, feedbackGate: FeedbackGate) async {
         guard !isLookingUp, !showProduct else { return }   // one lookup at a time; ignore while navigating away
         guard barcode != blockedBarcode else { return }    // don't spam-retry a code that just failed
         isLookingUp = true
         defer { isLookingUp = false }
+
+        // Analytics (best-effort): funnel starts here; capture t0 for latency.
+        let t0 = Date()
+        analytics.log(.scanStarted, ["source": .string(ScanSource.camera.rawValue)])
 
         // Fire immediately — before the network call — so the user gets
         // instant confirmation that the scan was caught, independent of
@@ -636,7 +641,21 @@ final class ScanViewModel {
         captureHandle.captureSnapshotForShatter { [weak self] image in
             self?.shatterEvent = ScanShatterEvent(image: image)
         }
-        await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService)
+        await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService,
+                            source: .camera, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
+    }
+
+    /// scan_succeeded + scan-count increment (feeds the sentiment gate). Kept in
+    /// one place so the barcode and OCR success branches log identically.
+    @MainActor
+    private func logScanSucceeded(source: ScanSource, startedAt t0: Date,
+                                  analytics: AnalyticsLogger, feedbackGate: FeedbackGate) {
+        analytics.log(.scanSucceeded, [
+            "source": .string(source.rawValue),
+            "latency_ms": .int(Int(Date().timeIntervalSince(t0) * 1000)),
+            "found": .bool(true),
+        ])
+        feedbackGate.recordSuccessfulScan()
     }
 
     /// Core barcode → product network lookup, shared by `handle(barcode:)`
@@ -645,23 +664,32 @@ final class ScanViewModel {
     /// error/needsOCR handling. Callers own the `isLookingUp` guard and the
     /// `.lookingUp` phase/haptic — this only does the request + result.
     @MainActor
-    private func lookUpProduct(barcode: String, api: APIClient, pantryService: PantryService) async {
+    private func lookUpProduct(barcode: String, api: APIClient, pantryService: PantryService,
+                              source: ScanSource, startedAt t0: Date,
+                              analytics: AnalyticsLogger, feedbackGate: FeedbackGate) async {
         do {
             let product = try await api.product(barcode: barcode)
             self.product = product
             phase = .scanning
             showProduct = true
+            logScanSucceeded(source: source, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
             // Auto-save to the pantry (MASTER_PLAN Phase 2). Fire-and-forget —
             // must never block/delay navigation to the result screen.
             pantryService.save(product: product)
         } catch APIClient.APIError.needsOCR {
             blockedBarcode = barcode
+            analytics.log(.scanFailed, ["source": .string(source.rawValue), "reason": .string("not_found")])
             phase = .needsOCR
         } catch let error as APIClient.APIError {
             blockedBarcode = barcode
+            analytics.log(.scanFailed, [
+                "source": .string(source.rawValue),
+                "reason": .string(error == .offline ? "offline" : "network"),
+            ])
             phase = .error(Self.scanErrorMessage(for: error))
         } catch {
             blockedBarcode = barcode
+            analytics.log(.scanFailed, ["source": .string(source.rawValue), "reason": .string("error")])
             phase = .error(APIClient.APIError.badResponse.errorDescription!)
         }
     }
@@ -672,22 +700,33 @@ final class ScanViewModel {
     /// provisional-scoring endpoint a barcode lookup would use. Reuses
     /// `isLookingUp` so a capture and a barcode lookup can never race.
     @MainActor
-    func captureLabel(handle: ScannerCaptureBridge, api: APIClient, pantryService: PantryService) async {
+    func captureLabel(handle: ScannerCaptureBridge, api: APIClient, pantryService: PantryService,
+                      analytics: AnalyticsLogger, feedbackGate: FeedbackGate) async {
         guard !isLookingUp, !showProduct else { return }
         isLookingUp = true
         defer { isLookingUp = false }
+        let t0 = Date()
         phase = .capturingLabel
 
         do {
             guard let text = try await handle.captureLabelText() else {
+                analytics.log(.scanFailed, [
+                    "source": .string(ScanSource.camera.rawValue),
+                    "reason": .string("label_not_found"),
+                ])
                 phase = .labelNotFound
                 return
             }
-            await analyzeLabelText(text, api: api, pantryService: pantryService)
+            await analyzeLabelText(text, api: api, pantryService: pantryService,
+                                   source: .camera, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
         } catch {
             // Capture/Vision-side failure (camera busy, no frame, no text
             // recognized) — calm "couldn't read that" recovery, since the
             // likely fix is lighting/positioning, not "something went wrong."
+            analytics.log(.scanFailed, [
+                "source": .string(ScanSource.camera.rawValue),
+                "reason": .string("label_not_found"),
+            ])
             phase = .labelNotFound
         }
     }
@@ -697,12 +736,15 @@ final class ScanViewModel {
     /// a picked photo, falls back to recognized text) — same backend call and
     /// error handling either way.
     @MainActor
-    private func analyzeLabelText(_ text: String, api: APIClient, pantryService: PantryService) async {
+    private func analyzeLabelText(_ text: String, api: APIClient, pantryService: PantryService,
+                                 source: ScanSource, startedAt t0: Date,
+                                 analytics: AnalyticsLogger, feedbackGate: FeedbackGate) async {
         do {
             let product = try await api.analyzeLabel(text: text)
             self.product = product
             phase = .scanning
             showProduct = true
+            logScanSucceeded(source: source, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
             // Same fire-and-forget pantry save as a barcode scan. OCR results
             // are limited-confidence (backend sets source=ocr/confidence=
             // limited) — Product.dataConfidence + ProductView already surface
@@ -711,8 +753,10 @@ final class ScanViewModel {
         } catch let error as APIClient.APIError {
             // A real network/backend failure — same calm, actionable
             // error banner a barcode lookup would show (offline-aware).
+            analytics.log(.scanFailed, ["source": .string(source.rawValue), "reason": .string("label_error")])
             phase = .error(Self.scanErrorMessage(for: error))
         } catch {
+            analytics.log(.scanFailed, ["source": .string(source.rawValue), "reason": .string("label_error")])
             phase = .error(APIClient.APIError.badResponse.errorDescription!)
         }
     }
@@ -733,10 +777,13 @@ final class ScanViewModel {
     /// `captureLabel(handle:)`, which would immediately bail on their own
     /// `isLookingUp` guard.
     @MainActor
-    func analyzeGalleryPhoto(_ item: PhotosPickerItem, api: APIClient, pantryService: PantryService) async {
+    func analyzeGalleryPhoto(_ item: PhotosPickerItem, api: APIClient, pantryService: PantryService,
+                             analytics: AnalyticsLogger, feedbackGate: FeedbackGate) async {
         guard !isLookingUp, !showProduct else { return }
         isLookingUp = true
         defer { isLookingUp = false }
+        let t0 = Date()
+        analytics.log(.scanStarted, ["source": .string(ScanSource.gallery.rawValue)])
         // We don't yet know if this is a barcode photo or a label photo, so
         // "Reading the label…" is the closer-fitting of the two existing
         // loading captions for this in-between "loading + running Vision" moment.
@@ -744,6 +791,10 @@ final class ScanViewModel {
 
         guard let data = try? await item.loadTransferable(type: Data.self),
               let uiImage = UIImage(data: data) else {
+            analytics.log(.scanFailed, [
+                "source": .string(ScanSource.gallery.rawValue),
+                "reason": .string("label_not_found"),
+            ])
             phase = .labelNotFound
             return
         }
@@ -752,7 +803,8 @@ final class ScanViewModel {
         if let barcode = detectedBarcode {
             feedback.notificationOccurred(.success)
             phase = .lookingUp
-            await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService)
+            await lookUpProduct(barcode: barcode, api: api, pantryService: pantryService,
+                                source: .gallery, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
             return
         }
 
@@ -760,10 +812,15 @@ final class ScanViewModel {
         guard let text = recognizedText else {
             // Neither a barcode nor readable text in the photo — calm retry,
             // reusing the existing labelNotFound copy/state.
+            analytics.log(.scanFailed, [
+                "source": .string(ScanSource.gallery.rawValue),
+                "reason": .string("label_not_found"),
+            ])
             phase = .labelNotFound
             return
         }
-        await analyzeLabelText(text, api: api, pantryService: pantryService)
+        await analyzeLabelText(text, api: api, pantryService: pantryService,
+                               source: .gallery, startedAt: t0, analytics: analytics, feedbackGate: feedbackGate)
     }
 
     /// Re-arms scanning — called on Retry/"Try another scan", and when the
@@ -867,6 +924,8 @@ private enum CameraAvailability: Equatable {
 struct ScanScreen: View {
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
+    @Environment(AnalyticsLogger.self) private var analytics
+    @Environment(FeedbackGate.self) private var feedbackGate
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var vm = ScanViewModel()
@@ -946,7 +1005,7 @@ struct ScanScreen: View {
             ScannerView(captureHandle: captureHandle, onBarcode: { code in
                 Task {
                     await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService,
-                                     captureHandle: captureHandle)
+                                     captureHandle: captureHandle, analytics: analytics, feedbackGate: feedbackGate)
                 }
             }, onPermissionDenied: {
                 availability = .permissionDenied
@@ -955,7 +1014,8 @@ struct ScanScreen: View {
 
             ScanOverlay(phase: vm.phase, captureHandle: captureHandle, shatterEvent: vm.shatterEvent) { item in
                 Task {
-                    await vm.analyzeGalleryPhoto(item, api: APIClient(session: session), pantryService: pantryService)
+                    await vm.analyzeGalleryPhoto(item, api: APIClient(session: session), pantryService: pantryService,
+                                                 analytics: analytics, feedbackGate: feedbackGate)
                 }
             }
             .ignoresSafeArea()
@@ -1006,7 +1066,8 @@ struct ScanScreen: View {
     }
 
     private func captureLabel() async {
-        await vm.captureLabel(handle: captureHandle, api: APIClient(session: session), pantryService: pantryService)
+        await vm.captureLabel(handle: captureHandle, api: APIClient(session: session), pantryService: pantryService,
+                              analytics: analytics, feedbackGate: feedbackGate)
     }
 
     private func labeledSpinner(_ text: String) -> some View {

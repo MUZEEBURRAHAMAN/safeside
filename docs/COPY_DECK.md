@@ -161,7 +161,27 @@
 ### Legal & attribution (Chunk 7)
 - Me rows: "Privacy policy" · "Terms of use" · "Data sources & attribution"
 - Attribution intro: "Product data comes from Open Food Facts, available under the Open Database License (ODbL)."
+- Attribution ODbL share-alike note: "Under the ODbL we attribute the data and share alike — improvements to the data stay open."
 - USDA line: "Nutrition enrichment from USDA FoodData Central (public domain)."
+
+### Legal bodies (Chunk 7) — ⚠️ DRAFT, LEGAL REVIEW REQUIRED before ship
+> Drafted in this deck's voice (calm, plain-language, no dark patterns) for `LegalViews.swift`. **Not reviewed legal copy** — a founder/legal pass is a ship gate. The Privacy body discloses analytics honestly per ANALYTICS_METRICS §8 (no third-party ad/tracking SDKs, data minimization, guest-first, `events`/`app_feedback` usage). Kept verbatim-in-sync with `LegalViews.swift`.
+
+**Privacy policy**
+- Intro: "Short version: you can use SafeSide as a guest, we collect as little as we can, and we never sell your data."
+- "You're a guest by default": "Nothing is required to scan a product and see its score. You can use the app without an account or sharing your name." / "If you answer the optional setup questions, that's to make suggestions fit you — every question is skippable."
+- "What we store": "The things that make the app work: your profile answers, the products you scan, your pantry and favorites, and any plans you build." / "This is tied to a random, pseudonymous account id — not your name or email."
+- "Analytics we keep": "We log a small set of in-app events — for example, that a scan started or a score was viewed — so we can see where the app helps and where people get stuck." / "These events carry only your pseudonymous id plus simple values like a score band or a product id. They never include the text you type, your photos, or anything read off a label." / "We don't use third-party ad or tracking SDKs, and we don't sell or share your data with advertisers."
+- "Feedback you send": "If you send feedback through the app, your message is stored separately from analytics and read only by our team, to help us fix things."
+- "Your control": "You stay a guest until you choose otherwise. A control to clear your on-device data is on the way, and you'll be able to ask us to delete your account data." / "Questions about your data? Reach us at privacy@safeside.app."
+
+**Terms of use**
+- Intro: "Short version: SafeSide gives you clear, sourced information about food — it's not medical advice."
+- "Information, not advice": "Scores and explanations are for general information. They're not medical, nutritional, or health advice, and they're not a diagnosis." / "For decisions about your health or diet, talk to a qualified professional. Always check the actual product label, especially for allergens."
+- "About the data": "Product details come from open databases and public sources. They can be incomplete or out of date, and we can't guarantee every detail is correct." / "If something looks wrong, use \"Report an issue\" on the product — it helps us and everyone else."
+- "Using the app": "SafeSide is for your personal, non-commercial use. Please don't misuse the service, try to break it, or scrape it."
+- "Changes": "We may update the app and these terms as SafeSide grows. If a change is significant, we'll do our best to make it clear. Continuing to use the app means you accept the current terms." / "Questions? Reach us at hello@safeside.app."
+- Shared footer (both screens): "Information only — not medical advice. Allergen data may be incomplete; check labels."
 
 ---
 

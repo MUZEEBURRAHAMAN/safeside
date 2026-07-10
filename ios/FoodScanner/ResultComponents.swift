@@ -101,6 +101,9 @@ struct FlowLayout: Layout {
 struct CollapsibleSection<Header: View, Content: View>: View {
     @State private var isExpanded: Bool
     private let cardStyle: Bool
+    /// Optional expand/collapse observer (Chunk 7 analytics). Default-nil so
+    /// every existing caller is unchanged; only `WhyScoreSection` threads it.
+    private let onExpandChanged: ((Bool) -> Void)?
     private let header: Header
     private let content: Content
 
@@ -109,11 +112,13 @@ struct CollapsibleSection<Header: View, Content: View>: View {
     init(
         initiallyExpanded: Bool = true,
         cardStyle: Bool = true,
+        onExpandChanged: ((Bool) -> Void)? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
     ) {
         _isExpanded = State(initialValue: initiallyExpanded)
         self.cardStyle = cardStyle
+        self.onExpandChanged = onExpandChanged
         self.header = header()
         self.content = content()
     }
@@ -144,6 +149,7 @@ struct CollapsibleSection<Header: View, Content: View>: View {
             withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
                 isExpanded.toggle()
             }
+            onExpandChanged?(isExpanded)
         } label: {
             HStack(alignment: .center, spacing: Theme.Space.s2) {
                 header
@@ -409,11 +415,13 @@ func formattedFetchedDate(_ iso: String?) -> String? {
 /// caveat when data is limited, and every factor row.
 struct WhyScoreSection: View {
     let score: ScoreResult
+    /// Fired once each time the section is *expanded* (Chunk 7: why_score_expanded).
+    var onExpand: (() -> Void)? = nil
 
     private var isLimited: Bool { score.confidence.lowercased() != "high" }
 
     var body: some View {
-        CollapsibleSection {
+        CollapsibleSection(onExpandChanged: { expanded in if expanded { onExpand?() } }) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Why this score")
@@ -1599,6 +1607,8 @@ struct ReportIssueSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionService.self) private var session
+    /// Optional so the sheet never crashes in a tree without the logger.
+    @Environment(AnalyticsLogger.self) private var analytics: AnalyticsLogger?
 
     private enum Phase: Equatable { case editing, sending, done, failed }
 
@@ -1741,6 +1751,13 @@ struct ReportIssueSheet: View {
                     reason: reason,
                     detail: trimmed.isEmpty ? nil : trimmed
                 )
+                // data_reported on submit-success. Reason is an enum; the
+                // free-text `detail` is NEVER logged (it goes only to the
+                // report endpoint / product_reports), keeping props PII-free.
+                analytics?.log(.dataReported, [
+                    "product_id": .string(productID),
+                    "reason": .string(reason.rawValue),
+                ])
                 phase = .done
             } catch {
                 phase = .failed

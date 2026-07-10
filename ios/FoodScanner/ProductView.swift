@@ -20,8 +20,13 @@ struct ProductView: View {
     /// guest/no-profile viewer of this screen should just see the same
     /// screen as before this feature existed (see `flaggedAllergies` below).
     @Environment(ProfileService.self) private var profileService: ProfileService?
+    /// Optional so this screen never crashes in a tree that didn't inject the
+    /// logger (previews/tests); analytics is best-effort and non-essential.
+    @Environment(AnalyticsLogger.self) private var analytics: AnalyticsLogger?
 
     @State private var identityVisible = false
+    /// Guards `score_viewed` to fire once per appearance (`.task` can re-run).
+    @State private var didLogScoreViewed = false
 
     /// Working copy of `product`. `product` itself never changes (it's the
     /// caller's contract), but a pantry-list entry arrives "thin" — score
@@ -162,6 +167,11 @@ struct ProductView: View {
                 showBetterOptionSheet = false
                 dismiss()
             }
+            // swap_shown fires when the better-options sheet appears (works for
+            // stub and real). TODO(chunk-3): swap_accepted on a real swap save.
+            .onAppear {
+                analytics?.log(.swapShown, ["from_score": .int(workingProduct.score?.score ?? -1)])
+            }
         }
         .sheet(isPresented: $showMethodologySheet) {
             MethodologySheet()
@@ -173,6 +183,7 @@ struct ProductView: View {
             ChatView(product: workingProduct)
         }
         .task {
+            logScoreViewedOnce()
             // Order matters: the pantry re-fetch can itself populate
             // ingredients, so the lazy ingredients load only hits the
             // network if that didn't already happen.
@@ -355,6 +366,7 @@ struct ProductView: View {
     /// competing with it.
     private var askAboutProductButton: some View {
         Button {
+            analytics?.log(.chatOpened, ["product_id": .string(workingProduct.id)])
             showChat = true
         } label: {
             HStack(spacing: Theme.Space.s2) {
@@ -400,7 +412,9 @@ struct ProductView: View {
     @ViewBuilder
     private var whyScoreOrNote: some View {
         if let score = workingProduct.score, !score.factors.isEmpty {
-            WhyScoreSection(score: score)
+            WhyScoreSection(score: score, onExpand: {
+                analytics?.log(.whyScoreExpanded, ["product_id": .string(workingProduct.id)])
+            })
         } else {
             CollapsibleSection {
                 Text("Why this score")
@@ -526,6 +540,21 @@ struct ProductView: View {
         } catch {
             ingredientsPhase = .failed
         }
+    }
+
+    // MARK: Analytics
+
+    /// score_viewed — fires once per appearance (scan- *and* pantry-originated
+    /// opens both count). Props are ids/enums/numbers only (no PII).
+    private func logScoreViewedOnce() {
+        guard !didLogScoreViewed else { return }
+        didLogScoreViewed = true
+        analytics?.log(.scoreViewed, [
+            "product_id": .string(workingProduct.id),
+            "band": .string(band.rawValue),
+            "score": .int(workingProduct.score?.score ?? -1),
+            "confidence": .string(workingProduct.score?.confidence ?? "unknown"),
+        ])
     }
 
     // MARK: Motion
