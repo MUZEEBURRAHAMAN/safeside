@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(SessionService.self) private var session
     @Environment(PantryService.self) private var pantryService
+    @Environment(NetworkMonitor.self) private var networkMonitor
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showScanner = false
     @State private var pantryFilter: PantryFilter = .recent
@@ -100,6 +101,18 @@ struct HomeView: View {
                         .buttonStyle(.plain)
 
                     ScanCTACard { showScanner = true }
+
+                    // Live offline banner (Chunk 6): cached pantry/trending
+                    // below stay browsable; Retry re-attempts the loads. Never
+                    // alarm-red, never a blank screen (teardown AVOID #5/#14).
+                    if !networkMonitor.isOnline {
+                        OfflineBanner {
+                            Task {
+                                await pantryService.loadRecent()
+                                await pantryService.loadTrending()
+                            }
+                        }
+                    }
 
                     if let dailyInsightText {
                         DailyInsightTile(text: dailyInsightText)
@@ -721,6 +734,7 @@ private struct TrendingSkeletonRow: View {
     HomeView()
         .environment(session)
         .environment(pantry)
+        .environment(NetworkMonitor())
 }
 
 #Preview("Product grid — incl. long name") {
@@ -775,7 +789,8 @@ private struct TrendingSkeletonRow: View {
 #Preview("Empty state") {
     VStack(spacing: 24) {
         StateCard(message: "Your pantry's empty — scan your first product.")
-        StateCard(message: "Something went wrong. Try again.", actionTitle: "Try again", action: {})
+        StateCard(message: "That didn't load right. Give it a moment and try again.", actionTitle: "Try again", action: {})
+        OfflineBanner {}
     }
     .padding(20)
     .background(Theme.canvas)

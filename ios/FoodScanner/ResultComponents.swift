@@ -1056,13 +1056,26 @@ struct IngredientsSkeletonView: View {
 /// target, not a dead-end.
 struct IngredientsLoadErrorView: View {
     let retry: () -> Void
+    /// When the fetch failed because the device is offline (not a server
+    /// fault), reframe so the sheet doesn't imply the backend is broken —
+    /// the rest of the Result screen stays fully readable (Chunk 6).
+    var isOffline: Bool = false
+
+    private var heading: String {
+        isOffline ? "You're offline" : "That didn't load right."
+    }
+    private var body_: String {
+        isOffline
+            ? "We couldn't load ingredient details — reconnect for the latest."
+            : "We couldn't load ingredient details. Try again."
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Text("Something went wrong.")
+            Text(heading)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("We couldn't load ingredient details. Try again.")
+            Text(body_)
                 .font(.footnote)
                 .foregroundStyle(Theme.textSecondary)
             Button(action: retry) {
@@ -1075,6 +1088,46 @@ struct IngredientsLoadErrorView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceCard()
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A slim, calm inline notice that the device is offline (Chunk 6). Neutral
+/// gray — never alarm-red (teardown AVOID #5) — with a scaled `wifi.slash`
+/// glyph and an optional trailing Retry. Copy is driven by the call site so a
+/// scan/search/pantry surface can each say the right COPY_DECK line. Cached
+/// content stays visible above/below it (AVOID #14: offline is never a blank
+/// screen).
+struct OfflineBanner: View {
+    var message: String = "You're offline. We'll show saved results; reconnect to scan new items."
+    var retry: (() -> Void)? = nil
+    @ScaledMetric(relativeTo: .subheadline) private var glyph: CGFloat = 15
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: glyph, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let retry {
+                Button("Retry", action: retry)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.greenDeep)
+                    .frame(minHeight: 44)
+            }
+        }
+        .padding(.horizontal, Theme.Space.s3)
+        .padding(.vertical, Theme.Space.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surfaceAlt, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        )
     }
 }
 

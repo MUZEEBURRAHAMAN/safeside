@@ -60,6 +60,15 @@ targets:
         CFBundleDisplayName: SafeSide
         NSCameraUsageDescription: "Scan product barcodes and labels to look up ingredients."
         UILaunchScreen: {}
+        # Portrait-only on iPhone (Chunk 6): the camera/Result layouts are
+        # designed portrait-first — a rotated launch was previously untested
+        # (default inherits all orientations). iPad keeps both portrait
+        # variants (TARGETED_DEVICE_FAMILY includes iPad).
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
         # Bundled display font (Space Grotesk, OFL) — the brand headline/score

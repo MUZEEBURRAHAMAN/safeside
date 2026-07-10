@@ -83,6 +83,7 @@
 
 ## Errors (what happened + how to fix — never "Something went wrong")
 - Network: "You're offline. We'll show saved results; reconnect to scan new items."
+- Server hiccup (generic backend/parse failure — not offline, not not-found): "That didn't load right. Give it a moment and try again." [Retry] (Chunk 6 — replaces every banned "Something went wrong")
 - Lookup fail: "Couldn't reach the product database. Check your connection and try again." [Retry]
 - Load fail (section): "Couldn't load {section}. Tap to retry." [Retry]
 - AI fail: "Couldn't generate a plan right now. You can build one manually." 

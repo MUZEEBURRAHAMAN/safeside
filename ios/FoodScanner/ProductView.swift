@@ -52,7 +52,11 @@ struct ProductView: View {
     /// behaviour is unchanged.
     @State private var isResolving = false
 
-    private enum IngredientsLoadPhase: Equatable { case idle, loading, failed }
+    /// `.failedOffline` is a calm variant of `.failed` used when the fetch
+    /// failed purely because the device is offline — the ingredient sheet then
+    /// reframes ("You're offline") instead of implying a server fault, while
+    /// the rest of the Result screen stays fully readable (Chunk 6).
+    private enum IngredientsLoadPhase: Equatable { case idle, loading, failed, failedOffline }
 
     init(product: Product) {
         self.product = product
@@ -431,10 +435,11 @@ struct ProductView: View {
             switch ingredientsPhase {
             case .loading:
                 IngredientsSkeletonView()
-            case .failed:
-                IngredientsLoadErrorView {
-                    Task { await loadIngredientsIfNeeded(forceRetry: true) }
-                }
+            case .failed, .failedOffline:
+                IngredientsLoadErrorView(
+                    retry: { Task { await loadIngredientsIfNeeded(forceRetry: true) } },
+                    isOffline: ingredientsPhase == .failedOffline
+                )
             case .idle:
                 if displayIngredients.isEmpty {
                     EmptyIngredientsView()
@@ -516,6 +521,8 @@ struct ProductView: View {
             let result = try await apiClient.ingredients(productID: workingProduct.id)
             fetchedIngredients = result
             ingredientsPhase = .idle
+        } catch APIClient.APIError.offline {
+            ingredientsPhase = .failedOffline
         } catch {
             ingredientsPhase = .failed
         }

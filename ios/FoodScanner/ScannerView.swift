@@ -101,6 +101,12 @@ final class CameraViewController: UIViewController {
     /// Reused across snapshot conversions — Apple recommends against
     /// creating a fresh `CIContext` per call (it's the expensive part).
     private let ciContext = CIContext()
+    /// Whether `setUpSession` actually rotated the `videoDataOutput` connection
+    /// to portrait. If the connection didn't support rotation (edge hardware),
+    /// this stays false and the shatter snapshot is orientation-corrected in
+    /// software instead of rendering sideways. Written/read only on
+    /// `sessionQueue` (setUpSession + captureSnapshotForShatter).
+    private var videoConnectionRotated = false
 
     /// The exact `AVCaptureDevice` behind the session's video input — the
     /// single source of truth for zoom/torch, and for the OCR still capture.
@@ -248,6 +254,7 @@ final class CameraViewController: UIViewController {
             // untested.)
             if let connection = videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported {
                 connection.videoOrientation = .portrait
+                videoConnectionRotated = true
             }
         }
 
@@ -393,9 +400,22 @@ final class CameraViewController: UIViewController {
                 DispatchQueue.main.async { completion(nil) }
                 return
             }
-            let image = UIImage(cgImage: cgImage)
+            // Orientation-correct: if the connection never rotated the buffer
+            // to portrait (edge hardware / non-portrait capture), the raw frame
+            // is 90° off — stamp `.right` so the shard grid renders upright
+            // instead of sideways (Chunk 6).
+            let orientation = Self.shatterImageOrientation(connectionApplied: self.videoConnectionRotated)
+            let image = UIImage(cgImage: cgImage, scale: 1, orientation: orientation)
             DispatchQueue.main.async { completion(image) }
         }
+    }
+
+    /// Pure orientation logic for the shatter snapshot (Chunk 6, TDD). When the
+    /// video connection already rotated the buffer to portrait the pixels are
+    /// upright (`.up`); when it didn't (landscape-native sensor), the raw frame
+    /// is rotated 90° and must be corrected to portrait with `.right`.
+    static func shatterImageOrientation(connectionApplied portrait: Bool) -> UIImage.Orientation {
+        portrait ? .up : .right
     }
 }
 
@@ -639,10 +659,10 @@ final class ScanViewModel {
             phase = .needsOCR
         } catch let error as APIClient.APIError {
             blockedBarcode = barcode
-            phase = .error(error.errorDescription ?? "Something went wrong. Try again.")
+            phase = .error(Self.scanErrorMessage(for: error))
         } catch {
             blockedBarcode = barcode
-            phase = .error("Something went wrong. Try again.")
+            phase = .error(APIClient.APIError.badResponse.errorDescription!)
         }
     }
 
@@ -689,11 +709,11 @@ final class ScanViewModel {
             // that; nothing extra to do here.
             pantryService.save(product: product)
         } catch let error as APIClient.APIError {
-            // A real network/backend failure — same generic, actionable
-            // error banner a barcode lookup would show.
-            phase = .error(error.errorDescription ?? "Something went wrong. Try again.")
+            // A real network/backend failure — same calm, actionable
+            // error banner a barcode lookup would show (offline-aware).
+            phase = .error(Self.scanErrorMessage(for: error))
         } catch {
-            phase = .error("Something went wrong. Try again.")
+            phase = .error(APIClient.APIError.badResponse.errorDescription!)
         }
     }
 
@@ -754,6 +774,18 @@ final class ScanViewModel {
         blockedBarcode = nil
         shatterEvent = nil
         feedback.prepare()
+    }
+
+    /// Calm, honest copy for a failed scan lookup (Chunk 6). Offline gets the
+    /// scan-specific COPY_DECK §Offline & limits line (pantry still works),
+    /// never the generic Network copy; every other backend/parse failure gets
+    /// the drafted "Server hiccup" line — never the banned "Something went
+    /// wrong."
+    static func scanErrorMessage(for error: APIClient.APIError) -> String {
+        if error == .offline {
+            return "You're offline. Scanning needs a connection — your pantry still works."
+        }
+        return error.errorDescription ?? APIClient.APIError.badResponse.errorDescription!
     }
 }
 
@@ -964,7 +996,7 @@ struct ScanScreen: View {
             )
         case .error(let message):
             calmBanner(
-                title: "Something went wrong.",
+                title: "That didn't load right.",
                 message: message,
                 actionTitle: "Retry",
                 action: { vm.reset() },

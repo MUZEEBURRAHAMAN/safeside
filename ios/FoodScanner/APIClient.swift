@@ -38,7 +38,16 @@ struct APIClient {
         case needsOCR
         case decoding
         case transport
-        case rateLimited
+        /// No usable connection (airplane mode / Wi-Fi dropped). Distinct from
+        /// `.transport` (server unreachable while online) so the UI can show
+        /// calm airplane-mode copy and keep cached content browsable (Chunk 6).
+        case offline
+        /// Backend rate-limited this caller (HTTP 429). Carries the parsed
+        /// back-off window (from the body's `retryAfterSeconds` or the
+        /// `Retry-After` header) so the chat input can disable for exactly that
+        /// long; `nil` when the server didn't say, and the caller applies a
+        /// sensible default (Chunk 6 owns the full 429 client path).
+        case rateLimited(retryAfterSeconds: Int?)
 
         /// Calm, actionable copy — never alarmist (docs/COPY_DECK.md).
         var errorDescription: String? {
@@ -46,17 +55,47 @@ struct APIClient {
             case .notConfigured:
                 return "The app isn't connected to a backend yet."
             case .badResponse, .decoding:
-                return "Something went wrong. Try again."
+                // COPY_DECK.md §Errors "Server hiccup" — never the banned
+                // generic-failure phrase (Chunk 6).
+                return "That didn't load right. Give it a moment and try again."
             case .notFound:
                 return "We don't have this one yet."
             case .needsOCR:
                 return "We don't have this one yet. Snap the ingredients label and we'll score it."
             case .transport:
                 return "Couldn't reach the server. Check your connection and try again."
+            case .offline:
+                // COPY_DECK.md §Errors Network, verbatim.
+                return "You're offline. We'll show saved results; reconnect to scan new items."
             case .rateLimited:
                 // COPY_DECK.md §"Offline & limits" — chat rate-limit (429), verbatim.
                 return "You've asked a lot in a short time. Give it a minute and try again."
             }
+        }
+
+        /// Pure `URLError.Code → APIError` mapping (testable without a live
+        /// socket). Connectivity-loss codes become `.offline` so the UI shows
+        /// airplane-mode copy; everything else stays `.transport`.
+        static func mapURLError(_ error: Error) -> APIError {
+            guard let urlError = error as? URLError else { return .transport }
+            switch urlError.code {
+            case .notConnectedToInternet, .timedOut, .networkConnectionLost,
+                 .cannotConnectToHost, .cannotFindHost, .dataNotAllowed,
+                 .internationalRoamingOff:
+                return .offline
+            default:
+                return .transport
+            }
+        }
+
+        /// Pure `Retry-After`/body → seconds parse for a 429. Prefers the body's
+        /// `retryAfterSeconds` (our backend contract), falls back to the
+        /// `Retry-After` header (integer seconds). Non-positive/garbage → `nil`
+        /// so the caller applies its own default rather than disabling forever.
+        static func parseRetryAfter(header: String?, bodySeconds: Int?) -> Int? {
+            let candidate = bodySeconds ?? header.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            guard let seconds = candidate, seconds > 0 else { return nil }
+            return seconds
         }
     }
 
@@ -65,6 +104,9 @@ struct APIClient {
     private struct ErrorBody: Decodable {
         let error: String?
         let needsOcr: Bool?
+        /// Present on a 429 body (`{ error: "rate_limited", retryAfterSeconds }`),
+        /// per the Chunk 4 `/chat` contract — the back-off window in seconds.
+        let retryAfterSeconds: Int?
     }
 
     /// Used to fetch a fresh token per-request; never cached on this struct.
@@ -94,7 +136,10 @@ struct APIClient {
         do {
             (data, resp) = try await URLSession.shared.data(for: req)
         } catch {
-            throw APIError.transport
+            // Offline (airplane mode) is told apart from a server-side
+            // transport failure so the UI can show calm airplane-mode copy
+            // and keep cached content browsable (Chunk 6).
+            throw APIError.mapURLError(error)
         }
 
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse }
@@ -107,9 +152,16 @@ struct APIClient {
             throw APIError.notFound
         }
         // 429: the backend rate-limited this caller (e.g. a burst of /chat).
-        // Surface the calm COPY_DECK line rather than a generic error so the
-        // chat UI tells the user exactly what to do (never a dead-end).
-        if http.statusCode == 429 { throw APIError.rateLimited }
+        // Decode the body's `retryAfterSeconds` (Chunk 4 contract) and/or the
+        // `Retry-After` header so the chat UI can back the input off for
+        // exactly that window with calm COPY_DECK copy (never a dead-end).
+        if http.statusCode == 429 {
+            let bodySeconds = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.retryAfterSeconds
+            let header = http.value(forHTTPHeaderField: "Retry-After")
+            throw APIError.rateLimited(
+                retryAfterSeconds: APIError.parseRetryAfter(header: header, bodySeconds: bodySeconds)
+            )
+        }
         guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse }
 
         do {
@@ -158,7 +210,7 @@ struct APIClient {
         do {
             (data, resp) = try await URLSession.shared.data(for: req)
         } catch {
-            throw APIError.transport
+            throw APIError.mapURLError(error)
         }
 
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse }

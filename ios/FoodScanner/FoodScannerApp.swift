@@ -6,6 +6,8 @@ struct FoodScannerApp: App {
     @State private var session: SessionService
     @State private var pantryService: PantryService
     @State private var profileService: ProfileService
+    // Live connectivity signal for the calm offline banners (Chunk 6).
+    @State private var networkMonitor = NetworkMonitor()
 
     // Onboarding is skippable and shown once — never gates scanning. Seeded
     // from UserDefaults so a fresh install (and only a fresh install) sees it.
@@ -61,6 +63,7 @@ struct FoodScannerApp: App {
             .environment(session)
             .environment(pantryService)
             .environment(profileService)
+            .environment(networkMonitor)
             .tint(Theme.greenDeep)
     }
 #endif
@@ -70,6 +73,7 @@ struct FoodScannerApp: App {
                 .environment(session)
                 .environment(pantryService)
                 .environment(profileService)
+                .environment(networkMonitor)
                 .tint(Theme.greenDeep)
                 .fullScreenCover(isPresented: $showOnboarding) {
                     OnboardingView {

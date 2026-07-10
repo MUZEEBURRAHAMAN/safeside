@@ -111,7 +111,7 @@ struct ChatView: View {
                     }
 
                     if case .failed(let errorMessage) = viewModel.phase {
-                        ErrorBubble(message: errorMessage) {
+                        ErrorBubble(message: errorMessage, retryDisabled: viewModel.isRateLimited) {
                             Task { await viewModel.retry() }
                         }
                         .id("error")
@@ -178,7 +178,7 @@ struct ChatView: View {
                         .strokeBorder(Theme.border, lineWidth: 1)
                 )
                 .focused($inputFocused)
-                .disabled(viewModel.isSending)
+                .disabled(viewModel.isSending || viewModel.isRateLimited)
                 .submitLabel(.send)
                 .onSubmit { sendDraft(viewModel) }
 
@@ -205,7 +205,9 @@ struct ChatView: View {
     // MARK: Actions
 
     private func canSend(_ viewModel: ChatViewModel) -> Bool {
-        !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSending
+        !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !viewModel.isSending
+            && !viewModel.isRateLimited
     }
 
     private func sendDraft(_ viewModel: ChatViewModel) {
@@ -258,6 +260,14 @@ final class ChatViewModel {
 
     private(set) var messages: [ChatMessage] = []
     private(set) var phase: Phase = .idle
+    /// Seconds left on a 429 back-off. While > 0 the input + Retry are
+    /// disabled so the user can't immediately re-trip the limit (Chunk 6 owns
+    /// the full 429 client path: it reads the server's `Retry-After` /
+    /// `retryAfterSeconds` and backs off for exactly that window).
+    private(set) var rateLimitSecondsRemaining: Int = 0
+    private var rateLimitTask: Task<Void, Never>?
+    /// Sensible default window when a 429 arrives without a `Retry-After`.
+    private static let defaultRateLimitBackoff = 60
     /// Default matches docs/COPY_DECK.md's footer disclaimer; overwritten by
     /// `ChatReply.disclaimer` once the backend actually replies, in case it
     /// ever wants to say something more specific.
@@ -273,6 +283,10 @@ final class ChatViewModel {
         return false
     }
 
+    /// True while a 429 back-off is counting down — the input + Retry stay
+    /// disabled for exactly this window with the calm COPY_DECK rate-limit copy.
+    var isRateLimited: Bool { rateLimitSecondsRemaining > 0 }
+
     /// The scroll-anchor id for "whatever's newest right now" — the typing
     /// indicator while sending, the error bubble on failure, else the last
     /// real message (or "top" before the first message, matching the
@@ -287,7 +301,7 @@ final class ChatViewModel {
     /// against re-entrancy (double-tap send / a starter chip tapped while a
     /// reply is already in flight) and empty/whitespace-only text.
     func send(_ text: String) async {
-        guard !isSending else { return }
+        guard !isSending, !isRateLimited else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         messages.append(ChatMessage(role: .user, content: trimmed))
@@ -297,7 +311,7 @@ final class ChatViewModel {
     /// Re-sends the same history after a failure — the failed turn's user
     /// message is already in `messages`, so this never duplicates it.
     func retry() async {
-        guard case .failed = phase else { return }
+        guard case .failed = phase, !isRateLimited else { return }
         await requestReply()
     }
 
@@ -312,7 +326,27 @@ final class ChatViewModel {
             }
             phase = .idle
         } catch {
+            // Full 429 path: on a rate-limit, back the input off for the
+            // server-specified window (or a default) while showing calm copy.
+            if let apiError = error as? APIClient.APIError,
+               case .rateLimited(let seconds) = apiError {
+                startRateLimitBackoff(seconds: seconds ?? Self.defaultRateLimitBackoff)
+            }
             phase = .failed(Self.friendlyMessage(for: error))
+        }
+    }
+
+    /// Counts `rateLimitSecondsRemaining` down to zero, one second at a time,
+    /// re-enabling the input when it clears. Cancels any prior countdown.
+    private func startRateLimitBackoff(seconds: Int) {
+        rateLimitTask?.cancel()
+        rateLimitSecondsRemaining = max(0, seconds)
+        rateLimitTask = Task { @MainActor [weak self] in
+            while true {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard let self, !Task.isCancelled, self.rateLimitSecondsRemaining > 0 else { return }
+                self.rateLimitSecondsRemaining -= 1
+            }
         }
     }
 
@@ -323,12 +357,18 @@ final class ChatViewModel {
     /// `errorDescription`.
     private static func friendlyMessage(for error: Error) -> String {
         if let apiError = error as? APIClient.APIError {
-            if apiError == .notConfigured {
+            switch apiError {
+            case .notConfigured:
                 return "AI chat isn't available right now."
+            case .offline:
+                // COPY_DECK §Offline & limits — chat-specific line (the product
+                // details are already on screen), not the generic Network copy.
+                return "Chat needs a connection. Your product details are still here."
+            default:
+                return apiError.errorDescription ?? APIClient.APIError.badResponse.errorDescription!
             }
-            return apiError.errorDescription ?? "Something went wrong. Try again."
         }
-        return "Something went wrong. Try again."
+        return APIClient.APIError.badResponse.errorDescription!
     }
 
     #if DEBUG
@@ -430,6 +470,9 @@ private struct TypingIndicatorBubble: View {
 /// errors: "what happened + how to fix"), never a dead-end.
 private struct ErrorBubble: View {
     let message: String
+    /// Disabled during a 429 back-off — retrying immediately would just
+    /// re-trip the limit, so the button dims until the window clears.
+    var retryDisabled: Bool = false
     let onRetry: () -> Void
 
     var body: some View {
@@ -443,6 +486,8 @@ private struct ErrorBubble: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.greenDeep)
                     .frame(minHeight: 44, alignment: .leading)
+                    .disabled(retryDisabled)
+                    .opacity(retryDisabled ? 0.4 : 1)
             }
             .padding(Theme.Space.s3)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
