@@ -101,7 +101,67 @@ function cleanToken(raw: string): string | null {
   // Drop pure numbers / single letters / obvious noise.
   if (t.length < 2) return null;
   if (!/[a-z]/i.test(t)) return null;
+  // Drop a bare E-number that leaked in as its own token (e.g. the "E150d)"
+  // fragment left when a comma-split breaks a "Colour (E150c, E150d)"
+  // parenthetical). The additive tag is already captured by E_NUMBER_RE over
+  // the whole region, so this fragment carries no ingredient meaning.
+  if (/^e\s?\d{3,4}[a-z]?$/i.test(t)) return null;
   return t;
+}
+
+/** OFF/EU function-class words that are label noise once the specific additive
+ * in their parenthetical is captured (en:eNNN or a name we resolve). */
+const ADDITIVE_CLASS_WORDS = new Set([
+  "colour",
+  "color",
+  "colours",
+  "colors",
+  "flavour",
+  "flavor",
+  "flavouring",
+  "flavoring",
+  "flavourings",
+  "flavorings",
+  "emulsifier",
+  "emulsifiers",
+  "stabiliser",
+  "stabilizer",
+  "stabilisers",
+  "stabilizers",
+  "preservative",
+  "preservatives",
+  "antioxidant",
+  "antioxidants",
+  "acidity regulator",
+  "acidity regulators",
+  "raising agent",
+  "raising agents",
+  "sweetener",
+  "sweeteners",
+  "thickener",
+  "thickeners",
+  "anti-caking agent",
+  "firming agent",
+  "humectant",
+  "glazing agent",
+]);
+
+/** True when `part` is just an additive-class word whose parenthetical resolves
+ * to an additive (E-number or a name in ADDITIVE_NAME_TO_TAG) — a redundant
+ * orphan we should NOT emit as a display ingredient. The closing paren is
+ * OPTIONAL so a comma-split fragment like "Colour (E150c" (from "Colour (E150c,
+ * E150d)") is still recognised and dropped. */
+function isAdditiveClassOrphan(part: string): boolean {
+  const paren = part.match(/^([^()]+?)\s*\(([^)]*)\)?[.;:*\s]*$/);
+  if (!paren) return false;
+  const base = paren[1].trim().toLowerCase().replace(/[.;:*]+$/g, "").trim();
+  if (!ADDITIVE_CLASS_WORDS.has(base)) return false;
+  const inside = paren[2].toLowerCase();
+  if (/\be[\s-]?\d{3,4}[a-z]?\b/.test(inside)) return true; // E-number inside
+  for (const seg of inside.split(/[,;-]+/)) { // named additive inside
+    if (ADDITIVE_NAME_TO_TAG.has(seg.trim())) return true;
+  }
+  return false;
 }
 
 export interface ParsedLabel {
@@ -123,6 +183,9 @@ export function parseLabel(text: string): ParsedLabel {
   const ingredients: string[] = [];
   const seen = new Set<string>();
   for (const part of region.split(/[,;]+/)) {
+    // Skip a redundant additive-class orphan ("Colour (E150d)") — its additive
+    // tag is already captured by E_NUMBER_RE / the name pass over the region.
+    if (isAdditiveClassOrphan(part)) continue;
     const token = cleanToken(part);
     if (!token) continue;
     const key = token.toLowerCase();

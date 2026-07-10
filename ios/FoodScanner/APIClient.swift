@@ -38,6 +38,7 @@ struct APIClient {
         case needsOCR
         case decoding
         case transport
+        case rateLimited
 
         /// Calm, actionable copy — never alarmist (docs/COPY_DECK.md).
         var errorDescription: String? {
@@ -52,6 +53,9 @@ struct APIClient {
                 return "We don't have this one yet. Snap the ingredients label and we'll score it."
             case .transport:
                 return "Couldn't reach the server. Check your connection and try again."
+            case .rateLimited:
+                // COPY_DECK.md §"Offline & limits" — chat rate-limit (429), verbatim.
+                return "You've asked a lot in a short time. Give it a minute and try again."
             }
         }
     }
@@ -102,6 +106,10 @@ struct APIClient {
             }
             throw APIError.notFound
         }
+        // 429: the backend rate-limited this caller (e.g. a burst of /chat).
+        // Surface the calm COPY_DECK line rather than a generic error so the
+        // chat UI tells the user exactly what to do (never a dead-end).
+        if http.statusCode == 429 { throw APIError.rateLimited }
         guard (200..<300).contains(http.statusCode) else { throw APIError.badResponse }
 
         do {

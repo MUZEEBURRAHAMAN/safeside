@@ -77,6 +77,38 @@ export const MAX_MESSAGE_CHARS = 2000;
 /** Hard cap on completion tokens (BACKEND_SPEC §5 cost control). */
 export const MAX_OUTPUT_TOKENS = 600;
 
+/** Per-user sliding-window rate limit (Chunk 4, Task 4). */
+export const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute sliding window
+export const RATE_LIMIT_MAX = 10; // requests per user per window (tunable)
+
+/** Calm 429 body copy — verbatim from docs/COPY_DECK.md §"Offline & limits". */
+export const CHAT_RATE_LIMITED =
+  "You've asked a lot in a short time. Give it a minute and try again.";
+
+export interface RateDecision {
+  allowed: boolean;
+  retryAfterSeconds: number;
+}
+
+/**
+ * Pure sliding-window check over epoch-ms timestamps. Blocks once `max`
+ * requests fall inside the last `windowMs`; `retryAfterSeconds` is how long
+ * until the oldest in-window hit ages out (so a client knows exactly when to
+ * retry). No I/O — unit-tested offline.
+ */
+export function withinRateLimit(
+  timestamps: number[],
+  now: number,
+  windowMs: number,
+  max: number,
+): RateDecision {
+  const inWindow = timestamps.filter((t) => now - t < windowMs).sort((a, b) => a - b);
+  if (inWindow.length < max) return { allowed: true, retryAfterSeconds: 0 };
+  const oldest = inWindow[0];
+  const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
+  return { allowed: false, retryAfterSeconds };
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
@@ -130,6 +162,15 @@ export interface Deps {
   /** null when LLM_API_KEY is unset → graceful canned reply. */
   llm: LlmClient | null;
   now(): number;
+  // --- Rate limiting (all optional → absent = limiter skipped, as in unit
+  // tests and when there is no authenticated user). Wired in index.ts against
+  // the service-role `chat_rate_events` ledger. ---
+  /** The caller's stable id — JWT `sub` (anon uids included), or null. */
+  userId?(): string | null;
+  /** Epoch-ms timestamps of this user's requests in the window (service role). */
+  recentChatRequests?(userId: string): Promise<number[]>;
+  /** Record one ACCEPTED request for this user at `atMs` (service role). */
+  recordChatRequest?(userId: string, atMs: number): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -416,6 +457,35 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   }
   if (!req.headers.get("Authorization")) {
     return json({ error: "unauthorized" }, 401);
+  }
+
+  // Per-user sliding-window rate limit (skipped when the ledger deps or user id
+  // are absent → backward-compatible with the offline unit tests). We record
+  // only ACCEPTED requests below, so a 429'd request never extends its window.
+  const uid = deps.userId?.() ?? null;
+  if (uid && deps.recentChatRequests && deps.recordChatRequest) {
+    const now = deps.now();
+    const recent = await deps.recentChatRequests(uid);
+    const decision = withinRateLimit(recent, now, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
+    if (!decision.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "rate_limited",
+          retryAfterSeconds: decision.retryAfterSeconds,
+          reply: CHAT_RATE_LIMITED,
+          disclaimer: DISCLAIMER,
+        }),
+        {
+          status: 429,
+          headers: {
+            ...CORS_HEADERS,
+            "Content-Type": "application/json",
+            "Retry-After": String(decision.retryAfterSeconds),
+          },
+        },
+      );
+    }
+    await deps.recordChatRequest(uid, now);
   }
 
   let rawBody: unknown;

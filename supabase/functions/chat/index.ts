@@ -37,6 +37,20 @@ const llm = createLlmClient({
   LLM_MODEL: Deno.env.get("LLM_MODEL"),
 });
 
+/** Decode the JWT `sub` (the user id; anon sessions carry one too) without
+ * verifying — the platform already verified the token before this function
+ * runs; we only need the id to key the rate-limit ledger. */
+function jwtSub(req: Request): string | null {
+  const auth = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!auth) return null;
+  try {
+    const payload = JSON.parse(atob(auth.split(".")[1] ?? ""));
+    return typeof payload.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildDeps(req: Request): Deps {
   return {
     async getProduct(id: string): Promise<ChatProductRow | null> {
@@ -111,6 +125,24 @@ function buildDeps(req: Request): Deps {
     llm,
 
     now: () => Date.now(),
+
+    // --- Rate-limit ledger (service role; clients can neither read nor write
+    // chat_rate_events). Keyed by the JWT sub so anon sessions are limited too.
+    userId: () => jwtSub(req),
+
+    async recentChatRequests(userId: string): Promise<number[]> {
+      const since = new Date(Date.now() - 60_000).toISOString();
+      const { data } = await supabase
+        .from("chat_rate_events")
+        .select("created_at")
+        .eq("user_id", userId)
+        .gte("created_at", since);
+      return (data ?? []).map((r) => Date.parse(r.created_at as string));
+    },
+
+    async recordChatRequest(userId: string): Promise<void> {
+      await supabase.from("chat_rate_events").insert({ user_id: userId });
+    },
   };
 }
 

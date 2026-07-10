@@ -18,6 +18,7 @@ import {
   buildMessages,
   CANNED_FILTERED,
   CANNED_UNAVAILABLE,
+  CHAT_RATE_LIMITED,
   type ChatMessage,
   type ChatProductRow,
   type ChatProfile,
@@ -29,8 +30,10 @@ import {
   handleChat,
   MAX_HISTORY_MESSAGES,
   parseReply,
+  RATE_LIMIT_MAX,
   resolveIngredientFacts,
   SYSTEM_PROMPT,
+  withinRateLimit,
 } from "./handler.ts";
 
 const PRODUCT_ID = "33333333-3333-3333-3333-333333333333";
@@ -441,6 +444,91 @@ Deno.test("malformed JSON body → 400", async () => {
   });
   const res = await handleChat(req, baseDeps());
   assertEquals(res.status, 400);
+});
+
+// ---------------------------------------------------------------------------
+// 6. Rate limiting (per-user sliding window)
+// ---------------------------------------------------------------------------
+
+Deno.test("withinRateLimit allows under the cap, blocks at/over it", () => {
+  const now = 1_000_000;
+  const win = 60_000, max = 3;
+  assertEquals(withinRateLimit([], now, win, max).allowed, true);
+  const three = [now - 100, now - 200, now - 300];
+  assertEquals(withinRateLimit(three, now, win, max).allowed, false);
+  // Timestamps older than the window don't count.
+  assertEquals(
+    withinRateLimit([now - 70_000, now - 80_000], now, win, max).allowed,
+    true,
+  );
+});
+
+Deno.test("withinRateLimit retryAfter = window minus age of oldest in-window hit", () => {
+  const now = 1_000_000, win = 60_000, max = 2;
+  const r = withinRateLimit([now - 10_000, now - 5_000], now, win, max);
+  assertEquals(r.allowed, false);
+  assertEquals(r.retryAfterSeconds, 50); // oldest hit ages out in 50s
+});
+
+/** Deps with the rate-limit hooks wired to a controllable fake ledger. */
+function rateDeps(
+  opts: { overLimit: boolean; uid?: string | null; now?: number },
+): { deps: Deps; state: { recorded: { uid: string; ms: number }[] } } {
+  const NOW = opts.now ?? 1_000_000;
+  const state = { recorded: [] as { uid: string; ms: number }[] };
+  const recent = opts.overLimit
+    ? Array.from({ length: RATE_LIMIT_MAX }, (_, i) => NOW - (i + 1) * 100)
+    : [];
+  const deps = baseDeps({
+    now: () => NOW,
+    userId: () => (opts.uid === undefined ? "user-1" : opts.uid),
+    recentChatRequests: (_uid: string) => Promise.resolve(recent),
+    recordChatRequest: (uid: string, ms: number) => {
+      state.recorded.push({ uid, ms });
+      return Promise.resolve();
+    },
+  });
+  return { deps, state };
+}
+
+Deno.test("handleChat returns 429 with calm copy when over the limit", async () => {
+  const { deps } = rateDeps({ overLimit: true });
+  const res = await handleChat(
+    chatReq({ productId: PRODUCT_ID, messages: ASK }),
+    deps,
+  );
+  assertEquals(res.status, 429);
+  assertEquals(res.headers.get("Retry-After") !== null, true);
+  const body = await res.json();
+  assertEquals(body.error, "rate_limited");
+  assertStringIncludes(body.reply, "Give it a minute");
+  assertEquals(body.reply, CHAT_RATE_LIMITED);
+  assertEquals(body.disclaimer, DISCLAIMER);
+});
+
+Deno.test("handleChat records the request and proceeds when under the limit", async () => {
+  const { deps, state } = rateDeps({ overLimit: false });
+  const res = await handleChat(
+    chatReq({ productId: PRODUCT_ID, messages: ASK }),
+    deps,
+  );
+  assertEquals(res.status, 200);
+  assertEquals(state.recorded.length, 1); // recordChatRequest called once
+});
+
+Deno.test("a 429'd request does NOT record (never extends its own window)", async () => {
+  const { deps, state } = rateDeps({ overLimit: true });
+  await handleChat(chatReq({ productId: PRODUCT_ID, messages: ASK }), deps);
+  assertEquals(state.recorded.length, 0);
+});
+
+Deno.test("no userId / missing ledger deps → limiter skipped, behaves as today", async () => {
+  // No rate-limit deps at all (baseline deps) → 200, unchanged behaviour.
+  const res = await handleChat(
+    chatReq({ productId: PRODUCT_ID, messages: ASK }),
+    baseDeps(),
+  );
+  assertEquals(res.status, 200);
 });
 
 Deno.test("history is bounded to the last N turns and trimmed", () => {

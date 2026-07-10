@@ -81,18 +81,18 @@ final class PantryService {
                 .value
 
             let scores: [ScoreResultRow] = try await client
-                .from("score_results")
+                .from("product_current_scores")
                 .select("id, product_id, score, band, confidence, score_version, computed_at")
                 .in("product_id", values: productIDs)
-                .order("computed_at", ascending: false)
                 .execute()
                 .value
 
             let productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
 
-            // score_results keeps history (docs/DATA_MODEL.md §2) — the query
-            // above orders desc, so the first row seen per product is the
-            // most recently computed one.
+            // `product_current_scores` already yields exactly one row per product
+            // (its latest by computed_at, Chunk 4). The per-product de-dup below
+            // is now a harmless no-op kept so a future non-view fallback still
+            // works.
             var latestScoreByProduct: [String: ScoreResultRow] = [:]
             for row in scores where latestScoreByProduct[row.productID] == nil {
                 latestScoreByProduct[row.productID] = row
@@ -120,17 +120,12 @@ final class PantryService {
     /// safe to call before or after `loadRecent()`, but call it after for the
     /// exclusion to actually apply).
     ///
-    /// ASSUMPTION: `score_results` keeps history (docs/DATA_MODEL.md §2) with
-    /// no server-side "current score per product" view, and PostgREST can't
-    /// express a per-group top-1 in one call. This fetches the highest-scoring
-    /// `band == high` rows across all history and keeps the first (highest)
-    /// row per product — in the common case (a product is scored once, or
-    /// re-scored and stays high) that's also its current score. A product
-    /// whose score *dropped* out of the high band since an earlier high score
-    /// could theoretically still surface here until this list is refreshed
-    /// again after the product is re-scored. Flagged as an open question —
-    /// the correct long-term fix is a backend view exposing one current row
-    /// per product.
+    /// Reads the `product_current_scores` view (Chunk 4) — exactly one row per
+    /// product, its latest score by `computed_at`. Filtering that view to
+    /// `band == high` and ordering by `score` desc therefore surfaces products
+    /// whose CURRENT score is high, never a stale highest-ever score (the bug
+    /// this view fixes). The per-product de-dup below is now redundant but
+    /// harmless.
     @MainActor
     func loadTrending(limit: Int = 5) async {
         guard session.isBackendReachable, let client = session.supabaseClient else { return }
@@ -144,7 +139,7 @@ final class PantryService {
             let fetchCount = limit + entries.count + 15
 
             let scores: [ScoreResultRow] = try await client
-                .from("score_results")
+                .from("product_current_scores")
                 .select("id, product_id, score, band, confidence, score_version, computed_at")
                 .eq("band", value: ScoreBand.high.rawValue)
                 .order("score", ascending: false)

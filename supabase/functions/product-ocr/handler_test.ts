@@ -78,6 +78,47 @@ Deno.test("parseLabel de-duplicates and drops noise tokens", () => {
   assert(lower.includes("salt"));
 });
 
+Deno.test("parseLabel drops the bare additive-class word when its parenthetical is an additive", () => {
+  const parsed = parseLabel("Ingredients: Water, Sugar, Colour (E150d), Salt.");
+  const lower = parsed.ingredients.map((i) => i.toLowerCase());
+  assert(!lower.includes("colour"), "no orphan 'colour' display token");
+  assert(!lower.includes("color"));
+  assert(parsed.additivesTags.includes("en:e150d"), "additive still captured");
+  assert(lower.includes("water") && lower.includes("sugar") && lower.includes("salt"));
+});
+
+Deno.test("parseLabel keeps a real ingredient that also carries an E-number", () => {
+  const parsed = parseLabel("Ingredients: Water, Citric Acid (E330), Salt.");
+  const lower = parsed.ingredients.map((i) => i.toLowerCase());
+  assert(lower.includes("citric acid"), "citric acid is a real ingredient, kept");
+  assert(parsed.additivesTags.includes("en:e330"));
+});
+
+Deno.test("parseLabel drops class words for named additive parentheticals too", () => {
+  const parsed = parseLabel(
+    "Ingredients: Cocoa, Emulsifier (Soya Lecithin - E322), Antioxidant (E306).",
+  );
+  const lower = parsed.ingredients.map((i) => i.toLowerCase());
+  assert(!lower.includes("emulsifier") && !lower.includes("antioxidant"));
+  assert(lower.includes("cocoa"));
+  assert(
+    parsed.additivesTags.includes("en:e322") && parsed.additivesTags.includes("en:e306"),
+  );
+});
+
+Deno.test("parseLabel handles a comma inside the additive parenthetical", () => {
+  const parsed = parseLabel("Ingredients: Water, Colour (E150c, E150d), Salt.");
+  const lower = parsed.ingredients.map((i) => i.toLowerCase());
+  assert(!lower.includes("colour"), "no orphan 'colour' token despite the comma split");
+  assert(!lower.includes("color"));
+  // The trailing "E150d)" fragment must not leak in as a stray display token.
+  assert(!lower.some((i) => /^e\s?\d{3,4}[a-z]?$/.test(i)), "no stray E-number token");
+  assert(lower.includes("water") && lower.includes("salt"));
+  // Both colour E-numbers are still captured as additive tags.
+  assert(parsed.additivesTags.includes("en:e150c"));
+  assert(parsed.additivesTags.includes("en:e150d"));
+});
+
 Deno.test("parseLabel reads a Contains allergen statement", () => {
   const parsed = parseLabel(
     "Ingredients: Wheat Flour, Milk, Egg. Contains: wheat, milk and egg.",
@@ -153,6 +194,12 @@ Deno.test("label text → provisional limited product, score omitted (band unkno
   assert(row.additives_tags.includes("en:e322"));
   assert(row.additives_tags.includes("en:e330"));
   assertStringIncludes(row.ingredients_text ?? "", "Sugar");
+  // "Emulsifier" is an additive-class word whose parenthetical is captured as
+  // en:e322 — it must NOT also appear as a redundant display ingredient.
+  assert(
+    !(row.ingredients_text ?? "").toLowerCase().includes("emulsifier"),
+    "no redundant 'Emulsifier' orphan ingredient",
+  );
 
   // Unknown score recorded (OCR has no NOVA / Nutri-Score → limited path).
   assertEquals(state.scores[0].band, "unknown");

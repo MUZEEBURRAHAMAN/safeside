@@ -40,14 +40,15 @@ const deps: Deps = {
       if (p.barcode) idToBarcode.set(p.id, p.barcode);
     }
 
-    // Latest score_results per product_id. Ordered newest-first; we keep the
-    // first (newest) row seen per product.
-    // TODO(chunk-4): read the product_current_scores view once it lands.
+    // Current score per product_id, read from the product_current_scores view
+    // (exactly one row per product = its latest score by computed_at). The view
+    // fixes the old "highest-ever" bug; the handler still enforces the
+    // transparency rule (only OUR band at the CURRENT score_version, never OFF's
+    // Nutri-Score).
     const { data: scores, error: sErr } = await supabase
-      .from("score_results")
-      .select("product_id,score,band,score_version,computed_at")
-      .in("product_id", [...idToBarcode.keys()])
-      .order("computed_at", { ascending: false });
+      .from("product_current_scores")
+      .select("product_id,score,band,score_version")
+      .in("product_id", [...idToBarcode.keys()]);
     if (sErr) throw sErr;
 
     for (
@@ -59,7 +60,7 @@ const deps: Deps = {
       }[]
     ) {
       const barcode = idToBarcode.get(row.product_id);
-      if (!barcode || map.has(barcode)) continue; // keep newest per product
+      if (!barcode) continue; // the view already yields one row per product
       if (row.score === null) continue; // unknown band has a null score
       map.set(barcode, {
         score: row.score,

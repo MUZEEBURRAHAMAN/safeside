@@ -46,12 +46,12 @@ interface CurrentScore {
 }
 
 /**
- * Newest score per product_id at the CURRENT score_version only (unknown-band /
- * null scores omitted). Mirrors search/index.ts:getScoresForBarcodes exactly —
- * the transparency rule (never OFF's Nutri-Score; only our current-version
- * band).
- * TODO(chunk-4): read current score from the product_current_scores view
- * instead of reducing latest-by-computed_at in JS.
+ * Current score per product_id, read from the product_current_scores view
+ * (exactly one row per product = its latest score by computed_at). Applies the
+ * transparency rule (never OFF's Nutri-Score; only OUR band at the CURRENT
+ * score_version, unknown-band / null scores omitted). The view fixes the old
+ * "reduce latest-by-computed_at in JS" path — and its highest-ever cousin in
+ * trending — with a single source of truth.
  */
 async function currentScoresFor(
   productIds: string[],
@@ -60,10 +60,9 @@ async function currentScoresFor(
   if (productIds.length === 0) return map;
 
   const { data, error } = await supabase
-    .from("score_results")
-    .select("product_id, score, band, score_version, computed_at")
-    .in("product_id", productIds)
-    .order("computed_at", { ascending: false });
+    .from("product_current_scores")
+    .select("product_id, score, band, score_version")
+    .in("product_id", productIds);
   if (error) throw error;
 
   for (
@@ -74,7 +73,6 @@ async function currentScoresFor(
       score_version: string;
     }[]
   ) {
-    if (map.has(row.product_id)) continue; // keep newest per product
     if (row.score_version !== SCORE_VERSION) continue; // only current version
     if (row.band === "unknown" || row.score === null) continue; // no usable score
     map.set(row.product_id, { score: row.score, band: row.band });
