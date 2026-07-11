@@ -903,19 +903,23 @@ private extension CGImagePropertyOrientation {
 /// so we can show the right calm state (docs/DESIGN_SYSTEM.md §5.9) instead of
 /// a blank camera view.
 private enum CameraAvailability: Equatable {
-    case ready              // supported, and not explicitly denied — CameraViewController
-                             // requests permission itself if it's still undetermined.
+    case ready              // authorized — safe to mount the live camera.
+    case needsPriming       // .notDetermined — show the benefit-first priming
+                             // hero FIRST; request access only on an affirmative
+                             // tap, never a raw OS prompt over a blank canvas
+                             // (UI_UX_AUDIT §Scanner CRITICAL).
     case unsupportedDevice  // no camera / unsupported hardware (e.g. Simulator).
     case permissionDenied   // user previously said no — only Settings can fix this.
 
     @MainActor
     static var current: CameraAvailability {
         guard AVCaptureDevice.default(for: .video) != nil else { return .unsupportedDevice }
-        let status = AVCaptureDevice.authorizationStatus(for: .video)
-        if status == .denied || status == .restricted { return .permissionDenied }
-        // .notDetermined or .authorized — CameraViewController prompts for
-        // permission itself the first time it configures the session.
-        return .ready
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:              return .ready
+        case .notDetermined:           return .needsPriming
+        case .denied, .restricted:     return .permissionDenied
+        @unknown default:              return .permissionDenied
+        }
     }
 }
 
@@ -936,6 +940,13 @@ struct ScanScreen: View {
     // Seeded optimistically; resolved on appear (the check is MainActor-isolated,
     // and @State default values are evaluated outside the main actor).
     @State private var availability = CameraAvailability.ready
+    /// The active capture mode (Barcode · Photo) driving the Oasis-style
+    /// segmented pill in `ScanOverlay`. Owned here so live barcode results can
+    /// be ignored while the user is in Photo mode.
+    @State private var scanMode: ScanMode = .barcode
+    /// The user tapped "Not now" on the camera-priming hero — show a calm way
+    /// back in rather than firing the OS prompt over a blank canvas.
+    @State private var primingDeclined = false
     /// Presents the Search screen (barcode mode) as a sheet — the last
     /// dead-end escape when a label is broken/absent (SCREEN_SPECS §Home item
     /// 2). A sheet, not a push, keeps the immersive dark scan chrome intact
@@ -944,9 +955,13 @@ struct ScanScreen: View {
 
     var body: some View {
         content
-            .navigationTitle("Scan")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear { availability = .current }
+            .onAppear {
+#if DEBUG
+                if ProcessInfo.processInfo.environment["SCAN_MODE"] == "photo" { scanMode = .photo }
+                if let forced = Self.debugForcedAvailability { availability = forced; return }
+#endif
+                availability = .current
+            }
             .sheet(isPresented: $showManualEntry) {
                 NavigationStack {
                     SearchView(startInBarcodeMode: true)
@@ -969,7 +984,12 @@ struct ScanScreen: View {
             .onChange(of: scenePhase) { _, newPhase in
                 // Re-check after returning from Settings (permission may have
                 // just been granted).
-                if newPhase == .active { availability = .current }
+                if newPhase == .active {
+#if DEBUG
+                    if let forced = Self.debugForcedAvailability { availability = forced; return }
+#endif
+                    availability = .current
+                }
             }
     }
 
@@ -977,17 +997,45 @@ struct ScanScreen: View {
     private var content: some View {
         switch availability {
         case .ready:
+            // Immersive dark scan moment — hide the OS nav bar so the
+            // viewfinder is edge-to-edge and the wordmark is the only title
+            // (UI_UX_AUDIT §Scanner MEDIUM/hierarchy).
             scannerBody
+                .toolbar(.hidden, for: .navigationBar)
+        case .needsPriming:
+            (primingDeclined ? AnyView(primingDeclinedView) : AnyView(primingView))
+                .toolbar(.hidden, for: .navigationBar)
         case .unsupportedDevice:
             unavailableView(
                 systemImage: "camera",
                 title: "Camera unavailable",
                 description: "Scanning needs a device camera. Run on a real iPhone."
             )
+            .navigationTitle("Scan")
+            .navigationBarTitleDisplayMode(.inline)
         case .permissionDenied:
             permissionDeniedView
+                .navigationTitle("Scan")
+                .navigationBarTitleDisplayMode(.inline)
         }
     }
+
+#if DEBUG
+    /// Screenshot harness: the Simulator has no camera, so `.current` resolves
+    /// to `.unsupportedDevice` and the scan chrome never renders. This lets the
+    /// screenshot matrix force a state via env (SIMCTL_CHILD_SCAN_STATE):
+    ///   chrome  → the live Oasis scan chrome (over a black feed)
+    ///   priming → the camera-permission priming hero
+    ///   denied  → the permission-denied light state
+    private static var debugForcedAvailability: CameraAvailability? {
+        switch ProcessInfo.processInfo.environment["SCAN_STATE"] {
+        case "chrome":  return .ready
+        case "priming": return .needsPriming
+        case "denied":  return .permissionDenied
+        default:        return nil
+        }
+    }
+#endif
 
     /// Calm, light-canvas styling for the two "can't show the camera" states
     /// (DESIGN_SYSTEM_V3 §1: dark is a moment, not the mode — these aren't the
@@ -1001,37 +1049,52 @@ struct ScanScreen: View {
     }
 
     private var scannerBody: some View {
-        ZStack {
-            ScannerView(captureHandle: captureHandle, onBarcode: { code in
-                Task {
-                    await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService,
-                                     captureHandle: captureHandle, analytics: analytics, feedbackGate: feedbackGate)
-                }
-            }, onPermissionDenied: {
-                availability = .permissionDenied
-            })
-            .ignoresSafeArea()
+        // Capture the true safe-area insets HERE (before `.ignoresSafeArea()`),
+        // then hand them to ScanOverlay — its own inner GeometryReader reports
+        // zero insets once the overlay is full-bleed, so the top wordmark/pill
+        // and bottom shutter need these to clear the Dynamic Island / home bar.
+        GeometryReader { geo in
+            ZStack {
+                ScannerView(captureHandle: captureHandle, onBarcode: { code in
+                    // Ignore live barcode hits while the user is in Photo (OCR)
+                    // mode — the scanner keeps running underneath, but Photo mode
+                    // captures via the shutter, not auto-detection.
+                    guard scanMode == .barcode else { return }
+                    Task {
+                        await vm.handle(barcode: code, api: APIClient(session: session), pantryService: pantryService,
+                                         captureHandle: captureHandle, analytics: analytics, feedbackGate: feedbackGate)
+                    }
+                }, onPermissionDenied: {
+                    availability = .permissionDenied
+                })
+                .ignoresSafeArea()
 
-            ScanOverlay(phase: vm.phase, captureHandle: captureHandle, shatterEvent: vm.shatterEvent) { item in
-                Task {
-                    await vm.analyzeGalleryPhoto(item, api: APIClient(session: session), pantryService: pantryService,
-                                                 analytics: analytics, feedbackGate: feedbackGate)
-                }
+                ScanOverlay(phase: vm.phase, mode: $scanMode, captureHandle: captureHandle,
+                            shatterEvent: vm.shatterEvent,
+                            onPhotoPicked: { item in
+                                Task {
+                                    await vm.analyzeGalleryPhoto(item, api: APIClient(session: session),
+                                                                 pantryService: pantryService,
+                                                                 analytics: analytics, feedbackGate: feedbackGate)
+                                }
+                            },
+                            onCaptureLabel: { Task { await captureLabel() } },
+                            topInset: geo.safeAreaInsets.top,
+                            bottomInset: geo.safeAreaInsets.bottom)
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
+            .overlay(alignment: .bottom) { phaseBanner }
         }
-        .overlay(alignment: .bottom) { phaseBanner }
     }
 
     @ViewBuilder
     private var phaseBanner: some View {
         switch vm.phase {
-        case .scanning:
+        case .scanning, .lookingUp, .capturingLabel:
+            // The loading confirmation ("Reading…") is now co-located just
+            // above the reticle inside ScanOverlay (UI_UX_AUDIT §Scanner HIGH),
+            // not pinned to the bottom — only the actionable banners stay here.
             EmptyView()
-        case .lookingUp:
-            labeledSpinner("Reading the barcode…")
-        case .capturingLabel:
-            labeledSpinner("Reading the label…")
         case .needsOCR:
             ocrBanner(
                 title: "We don't have this one yet.",
@@ -1070,18 +1133,85 @@ struct ScanScreen: View {
                               analytics: analytics, feedbackGate: feedbackGate)
     }
 
-    private func labeledSpinner(_ text: String) -> some View {
-        HStack(spacing: Theme.Space.s2) {
-            ProgressView().tint(Theme.onGreen)
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(Theme.onGreen)
+    // MARK: - Camera-permission priming (UI_UX_AUDIT §Scanner CRITICAL)
+
+    /// Benefit-first, on-brand dark hero shown for `.notDetermined` — the raw
+    /// iOS camera prompt must NOT fire over a blank canvas. We explain the
+    /// payoff first and request access only on the affirmative "Turn on camera"
+    /// tap (competitors do this to materially raise grant rate). Copy is
+    /// calm/ED-safe (COPY_DECK voice), no fear-mongering.
+    private var primingView: some View {
+        VStack(spacing: Theme.Space.s5) {
+            Spacer()
+            Image(systemName: "barcode.viewfinder")
+                .font(.system(size: 56, weight: .regular))
+                .foregroundStyle(Theme.lime)
+                .accessibilityHidden(true)
+            VStack(spacing: Theme.Space.s3) {
+                Text("See what's really inside")
+                    .font(DisplayType.hero)
+                    .foregroundStyle(Theme.onGreen)
+                    .multilineTextAlignment(.center)
+                Text("Point your camera at a barcode for a clear, sourced score — no guesswork, no shame.")
+                    .font(.body)
+                    .foregroundStyle(Theme.onGreen.opacity(0.85))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, Theme.Space.s5)
+            Spacer()
+            VStack(spacing: Theme.Space.s3) {
+                Button(action: requestCameraAccess) {
+                    Text("Turn on camera")
+                        .font(.headline)
+                        .foregroundStyle(Theme.onGreen)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                }
+                .background(Theme.greenDeep, in: Capsule())
+                .accessibilityHint("Asks for camera permission so you can scan products.")
+                Button("Not now") { primingDeclined = true }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.onGreen.opacity(0.8))
+                    .frame(minHeight: 44)
+            }
+            .padding(.horizontal, Theme.Space.s5)
+            .padding(.bottom, Theme.Space.s6)
         }
-        .padding(Theme.Space.s4)
-        .background(Theme.forest.opacity(0.92))
-        .clipShape(Capsule())
-        .padding(.bottom, Theme.Space.s6)
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.ink)
+        .ignoresSafeArea()
+    }
+
+    /// Calm light-canvas escape after "Not now" — no OS prompt was fired, so a
+    /// single tap re-opens the priming hero whenever the user's ready.
+    private var primingDeclinedView: some View {
+        ContentUnavailableView {
+            Label("Scanning is off", systemImage: "barcode.viewfinder")
+        } description: {
+            Text("Turn on the camera whenever you're ready to scan.")
+        } actions: {
+            Button { primingDeclined = false } label: {
+                Text("Turn on camera")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(Theme.onGreen)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, Theme.Space.s5)
+            }
+            .background(Theme.greenDeep, in: Capsule())
+        }
+        .tint(Theme.greenDeep)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas)
+    }
+
+    /// Requests camera access on the affirmative priming tap, then flips
+    /// availability on the result. Granted → `.ready` mounts the live camera;
+    /// denied → the calm permission-denied (Settings) state.
+    private func requestCameraAccess() {
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            DispatchQueue.main.async {
+                availability = granted ? .ready : .permissionDenied
+            }
+        }
     }
 
     // MARK: - Banner button styles (v3 card language on the dark surface)
