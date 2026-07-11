@@ -47,6 +47,19 @@ struct FoodScannerApp: App {
                 harness { MeView() }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "plan" {
                 harness { PlanView() }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "home" {
+                harness { NavigationStack { HomeView() } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "search" {
+                harness { NavigationStack { SearchView() } }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "swaps" {
+                harness {
+                    Color(.systemBackground)
+                        .sheet(isPresented: .constant(true)) {
+                            SwapsView(product: .sampleScored, onScanAnother: {})
+                        }
+                }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "chat" {
+                harness { NavigationStack { ChatView(product: .sampleScored) } }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "onboarding" {
                 harness { OnboardingView {} }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "scan" {
