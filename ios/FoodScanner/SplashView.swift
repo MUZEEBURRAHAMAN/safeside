@@ -8,31 +8,18 @@ import SwiftUI
 struct SplashView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .largeTitle) private var badge: CGFloat = 104
-    @ScaledMetric(relativeTo: .largeTitle) private var glyph: CGFloat = 52
     @State private var appear = false
 
     var body: some View {
         ZStack {
             Theme.canvas.ignoresSafeArea()
 
-            VStack(spacing: Theme.Space.s4) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: badge * 0.24, style: .continuous)
-                        .fill(Theme.greenSoft)
-                        .frame(width: badge, height: badge)
-                    Image(systemName: "checkmark.shield.fill")
-                        .font(.system(size: glyph, weight: .bold))
-                        .foregroundStyle(Theme.greenDeep)
-                        .scaleEffect(appear ? 1 : 0.5)
-                        .opacity(appear ? 1 : 0)
-                }
-
-                Text("SafeSide")
-                    .font(.display(34, weight: .bold, relativeTo: .largeTitle))
-                    .foregroundStyle(Theme.greenDeep)
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : 10)
-            }
+            Image("BrandLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: badge * 2.1)
+                .scaleEffect(appear ? 1 : 0.82)
+                .opacity(appear ? 1 : 0)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("SafeSide")

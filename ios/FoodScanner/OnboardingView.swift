@@ -116,6 +116,12 @@ struct OnboardingView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            Image("BrandLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 44)
+                .accessibilityLabel("SafeSide")
+                .padding(.bottom, Theme.Space.s1)
             SlimProgressBar(progress: Double(stepIndex + 1) / Double(Step.allCases.count))
             Text("Step \(stepIndex + 1) of \(Step.allCases.count)")
                 .font(.caption.weight(.semibold))
