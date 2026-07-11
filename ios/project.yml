@@ -34,6 +34,10 @@ settings:
     # Muzeeb's Personal Team (free Apple ID). Swap for a paid-program team ID
     # before TestFlight/App Store. Simulator builds work regardless.
     DEVELOPMENT_TEAM: "JPS4HAKT9Z"
+    # Release versioning (TestFlight #3). Bump CURRENT_PROJECT_VERSION on every
+    # upload (App Store Connect requires a unique build per version).
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
 
 packages:
   Supabase:
