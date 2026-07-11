@@ -5,7 +5,13 @@
 ## What & why
 Oasis has a **Categories** page (list of category cards) → tap → **"Top rated in {category}"** (products ranked best-first). Add the same to SafeSide: browse scored products by food category, ranked by our current score.
 
-Entry point (founder ask: "show that card"): a **"Browse categories" card on Home** → `CategoriesView` → `CategoryDetailView`.
+Entry point (revised): a **dedicated bottom-nav Categories tab** — bar becomes **Home · Categories · Scan · Me** (the Plan tab is removed from the bar for now; `PlanView` stays in code, restored later). Categories tab → `CategoriesView` → `CategoryDetailView`.
+
+## Verification / "best in category" (honesty gate)
+Founder wanted "proven by multiple testing agencies." **We have no such data, and no free API provides multi-agency lab verification for packaged food** — that is Oasis's own proprietary lab work. The free food-data source is **Open Food Facts** (Nutri-Score, NOVA, additives, popularity), which our deterministic score already runs on, plus our regulator-sourced ingredient KB. So:
+- **"Best in a category" = ranked by OUR sourced score, best-first, high-confidence products only** (drop `confidence == "limited"` / unscored). The good ones float to the top.
+- Show the **real provenance** we have (Open Food Facts + regulator KB + our confidence chip). **No "Lab tested / Proven by N agencies" badge** — that would be a fabricated claim (AVOID list + principle #1).
+- **Scaffold** a data-driven `verifiedBy: [Agency]` field + a "Verified by {agencies}" badge that stays **OFF** until a real multi-source dataset is plugged in (see commented-out list). Flip on later, no rewrite, no false claims now.
 
 ## Data reality (drives the stub list below)
 - Products only enter the DB when scanned/seeded. Today: **35 products, 23 with `categories_tags`**, 2–8 per category. So category lists are **thin** until more products are scored.
@@ -47,8 +53,9 @@ Entry point (founder ask: "show that card"): a **"Browse categories" card on Hom
 - [ ] Rows: `ProductThumbnail` + name (2 lines) + brand meta + sourced "Scored" chip (only when we have a current score) + trailing compact `ScoreBadge` ring. Ranked best-first. Row tap → `ProductLoaderView(barcode:)`.
 - [ ] States: loading skeleton · ranked list · **honest empty** ("No scored products here yet — scan one to start the list." + a Scan action, never a dead-end) · error (calm + retry, reuse the offline/error copy).
 
-### Task 5 — Home entry card
-- [ ] `CategoriesEntryCard` (icon + "Browse categories" + subtitle "See top-rated by type" + chevron), v3 floating card, placed under the search field (HomeView.swift ~100). `NavigationLink { CategoriesView() }`.
+### Task 5 — Bottom-nav Categories tab (replace Plan)
+- [ ] In `RootTabView` (FoodScannerApp.swift:141) swap the **Plan** tab for **Categories**: `CategoriesView().tabItem { Label("Categories", systemImage: "square.grid.2x2") }`. Bar order: Home · Categories · Scan · Me.
+- [ ] Keep `PlanView` in the codebase; comment its `.tabItem` out with `// TODO(categories-later): restore Plan tab`. Keep the `SHOW_SCREEN=plan` harness route.
 
 ### Task 6 — Verify
 - [ ] Add DEBUG harness routes: `SHOW_SCREEN=categories` (CategoriesView) + `categorydetail` (CategoryDetailView with a seeded category) for the screenshot matrix.
@@ -64,8 +71,9 @@ Build the structure but leave these off, clearly marked:
 4. **Category product counts** badge ("12 products") on cards — needs a count query per category; comment the `count` field + query.
 5. **Dedicated backend** `GET /categories` + `GET /category/:tag/products` edge functions — client PostgREST is enough now; comment a stub note. Revisit if we need server-side ranking/paging.
 6. **Dynamic category discovery** (build the list from DISTINCT `categories_tags`) — messy taxonomy; keep the curated static list. Comment the discovery query.
-7. **Categories as its own tab** — keep the Home-card entry for now; leave a `// TODO` where a 5th tab could go in `RootTabView`.
-8. **Hide-empty-categories** logic — show all curated categories with an honest empty state for now; comment the "only show categories with ≥N scored products" filter.
+7. **`verifiedBy` agency badge** — a data-driven "Verified by {agencies}" badge on rows/detail. Scaffold the `verifiedBy: [Agency]` field + the badge view but keep it **empty/off** (renders nothing) until a real multi-source lab dataset exists. `// TODO(categories-later): populate verifiedBy from a real dataset`. NEVER hardcode fake agencies.
+8. **Restore Plan tab** — `PlanView` stays in code; its tab item is commented out. `// TODO(categories-later): restore Plan tab (5th slot or swap back)`.
+9. **Hide-empty-categories** logic — show all curated categories with an honest empty state for now; comment the "only show categories with ≥N scored products" filter.
 
 ## Exit criteria
 - Home → Browse categories → a category → ranked best-first list of our scored products → tap opens the product. Empty categories show a calm never-dead-end state, not a spinner. Build + iOS tests green. No new backend. Commented-for-later items are scaffolded + `// TODO(categories-later)` tagged, not deleted.
