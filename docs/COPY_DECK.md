@@ -41,6 +41,14 @@
 - Confirmation: "Added to {day} {meal}."
 - Not in pantry: "Add to shopping list to grab next shop."
 
+## Home (redesign — wordmark + how-it-works carousel + quick actions)
+- Wordmark: "SafeSide" · greeting: "Know what's really in your food."
+- Carousel 1: "Scan any barcode" / "Point your camera, get a result in seconds."
+- Carousel 2: "See a sourced score" / "Every number cited, dose-aware — no black box."
+- Carousel 3: "Swap for a better option" / "A better choice in the same category."
+- Quick actions: "Scan" · "Search" · "Categories" · "Favorites"
+- (Recent-scans empty reuses Pantry §: "Your pantry's empty — scan your first product.")
+
 ## Pantry
 - Empty: "Your pantry's empty. Scan your first product to start."
 - Favorite: "Saved to favorites."

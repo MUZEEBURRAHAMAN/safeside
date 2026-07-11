@@ -12,11 +12,21 @@ struct HomeView: View {
     @Environment(PantryService.self) private var pantryService
     @Environment(NetworkMonitor.self) private var networkMonitor
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showScanner = false
     @State private var pantryFilter: PantryFilter = .recent
     @State private var pantrySort: PantrySort = .recent
     /// Product pending a remove confirmation (context menu → dialog).
     @State private var pendingRemoval: Product?
+
+    /// Switch top-level tabs from a quick-action tile (e.g. Categories). Nil in
+    /// standalone previews/harness, where a tile tap is simply inert — the real
+    /// app always injects it from `RootTabView`.
+    var onSelectTab: ((RootTab) -> Void)? = nil
+
+    /// Scroll anchor so the "Favorites" quick-action can bring the pantry
+    /// section (switched to its Favorites filter) into view.
+    private let pantryAnchor = "home-pantry-section"
 
     private enum PantryFilter: String, CaseIterable, Identifiable {
         case recent, favorites
@@ -93,51 +103,66 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s6) {
-                    heroHeader
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Space.s6) {
+                        wordmarkGreeting
 
-                    NavigationLink { SearchView() } label: { SearchFieldRow() }
-                        .buttonStyle(.plain)
+                        // Showcase carousel (v3 §5 showcase): a swipeable, paged
+                        // set of green "how it works" cards that teach the flow
+                        // — scan → sourced score → better swap. Auto-advance is
+                        // slow and disabled under Reduce Motion (handled inside).
+                        HowItWorksCarousel()
 
-                    ScanCTACard { showScanner = true }
+                        // Four calm greenSoft shortcuts (matches the Categories
+                        // cards + Scan chrome): Scan · Search · Categories ·
+                        // Favorites. See `quickActionGrid` for each route.
+                        quickActionGrid(proxy: proxy)
 
-                    // Live offline banner (Chunk 6): cached pantry/trending
-                    // below stay browsable; Retry re-attempts the loads. Never
-                    // alarm-red, never a blank screen (teardown AVOID #5/#14).
-                    if !networkMonitor.isOnline {
-                        OfflineBanner {
-                            Task {
-                                await pantryService.loadRecent()
-                                await pantryService.loadTrending()
+                        // Live offline banner (Chunk 6): cached pantry/trending
+                        // below stay browsable; Retry re-attempts the loads. Never
+                        // alarm-red, never a blank screen (teardown AVOID #5/#14).
+                        if !networkMonitor.isOnline {
+                            OfflineBanner {
+                                Task {
+                                    await pantryService.loadRecent()
+                                    await pantryService.loadTrending()
+                                }
                             }
                         }
-                    }
 
-                    if let dailyInsightText {
-                        DailyInsightTile(text: dailyInsightText)
-                    }
+                        if let dailyInsightText {
+                            DailyInsightTile(text: dailyInsightText)
+                        }
 
-                    VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                        pantryHeader
-                        pantrySection
-                    }
+                        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                            pantryHeader
+                            pantrySection
+                        }
+                        .id(pantryAnchor)
 
-                    VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                        Text("Trending healthy")
-                            .font(DisplayType.h2)
-                            .foregroundStyle(Theme.textPrimary)
-                        trendingContent
+                        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                            Text("Trending healthy")
+                                .font(DisplayType.h2)
+                                .foregroundStyle(Theme.textPrimary)
+                            trendingContent
+                        }
                     }
+                    .padding(.horizontal, Theme.Space.s45)
+                    .padding(.top, Theme.Space.s4)
+                    .padding(.bottom, Theme.Space.s7)   // clear the tab bar
                 }
-                .padding(.horizontal, Theme.Space.s45)
-                .padding(.top, Theme.Space.s4)
-                .padding(.bottom, Theme.Space.s7)   // clear the tab bar
             }
             .background(Theme.canvas)
-            // Hero headline is the screen's title — no redundant nav-bar title
-            // (also removes the green card "ghosting" under a translucent bar).
+            // The wordmark is the screen's title — no redundant nav-bar title
+            // (also removes card "ghosting" under a translucent bar).
             .toolbar(.hidden, for: .navigationBar)
+            .refreshable {
+                // Pull-to-refresh re-runs both loads (sequential so trending can
+                // exclude just-loaded pantry items), mirroring the `.task` below.
+                await pantryService.loadRecent()
+                await pantryService.loadTrending()
+            }
             .task(id: session.userID) {
                 // Re-runs once the anonymous session's userID resolves
                 // (bootstrap is async), and whenever it changes (e.g. later
@@ -159,20 +184,78 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Hero
+    // MARK: - Wordmark + greeting
 
-    /// The screen's one bold Space Grotesk display moment (v3 §3: "max one
-    /// display per screen region"), matching docs/COPY_DECK.md's intro line.
-    private var heroHeader: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Text("What's really in your food?")
-                .font(DisplayType.hero)
-                .foregroundStyle(Theme.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+    /// The SafeSide wordmark (Space Grotesk, brand green) + one calm greeting
+    /// line — the screen's brand moment (v3 §3: "max one display per region").
+    /// Uses `greenDeep` (not the lighter `green`) so the large bold wordmark
+    /// clears WCAG AA large-text 3:1 contrast on the mint canvas (§7).
+    private var wordmarkGreeting: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s1) {
+            Text("SafeSide")
+                .font(DisplayType.h1)
+                .foregroundStyle(Theme.greenDeep)
                 .accessibilityAddTraits(.isHeader)
-            Text("Scan any barcode for a clear, sourced score.")
+            Text("Know what's really in your food.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    // MARK: - Quick-action grid
+
+    /// Two columns normally, four across; drops to a 2×2 grid at accessibility
+    /// Dynamic Type sizes so labels never crush (§7: "reflow, never clip").
+    private var quickActionColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: Theme.Space.s3), GridItem(.flexible())]
+            : Array(repeating: GridItem(.flexible(), spacing: Theme.Space.s3), count: 4)
+    }
+
+    /// Four calm greenSoft shortcuts. Routes chosen to stay honest + never a
+    /// dead-end:
+    ///   • Scan       → the scanner `fullScreenCover` (unchanged).
+    ///   • Search     → pushes `SearchView` in Home's own stack (push-safe).
+    ///   • Categories → hops to the Categories tab via `onSelectTab` (its view
+    ///                  owns its own `NavigationStack`, so we switch tabs rather
+    ///                  than nest a second stack).
+    ///   • Favorites  → there is NO two-product Compare picker in the app yet
+    ///                  (CompareView only opens from a product vs. a swap), so
+    ///                  per the brief we route the 4th tile to Favorites: it
+    ///                  flips the pantry filter and scrolls to it — the honest,
+    ///                  non-dead-end pool a user would compare *from*.
+    private func quickActionGrid(proxy: ScrollViewProxy) -> some View {
+        LazyVGrid(columns: quickActionColumns, spacing: Theme.Space.s3) {
+            Button { showScanner = true } label: {
+                QuickActionTileLabel(icon: "barcode.viewfinder", label: "Scan")
+            }
+            .buttonStyle(CardPressButtonStyle())
+            .accessibilityLabel("Scan a product")
+            .accessibilityHint("Opens the scanner.")
+
+            NavigationLink { SearchView() } label: {
+                QuickActionTileLabel(icon: "magnifyingglass", label: "Search")
+            }
+            .buttonStyle(CardPressButtonStyle())
+            .accessibilityLabel("Search any product")
+
+            Button { onSelectTab?(.categories) } label: {
+                QuickActionTileLabel(icon: "square.grid.2x2", label: "Categories")
+            }
+            .buttonStyle(CardPressButtonStyle())
+            .accessibilityLabel("Browse categories")
+
+            Button {
+                pantryFilter = .favorites
+                withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
+                    proxy.scrollTo(pantryAnchor, anchor: .top)
+                }
+            } label: {
+                QuickActionTileLabel(icon: "heart", label: "Favorites")
+            }
+            .buttonStyle(CardPressButtonStyle())
+            .accessibilityLabel("Your favorites")
+            .accessibilityHint("Shows the products you've saved.")
         }
     }
 
@@ -328,82 +411,157 @@ private struct CardPressButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Scan CTA card (Home's anchor, v3 §5.6)
+// MARK: - How-it-works carousel (Home showcase)
 
-/// The full-width green Scan CTA — Home's primary action and the screen's
-/// anchor, not a plain button in a list. Decorative glyphs (icon circle,
-/// trailing chevron) are hidden from VoiceOver; the button carries one clear
-/// spoken label + hint instead.
-private struct ScanCTACard: View {
-    let action: () -> Void
-    // Glyph + its circle scale together with Dynamic Type (DESIGN.md §3.2).
-    @ScaledMetric(relativeTo: .title3) private var iconCircle: CGFloat = 56
-    @ScaledMetric(relativeTo: .title3) private var iconGlyph: CGFloat = 26
+/// One "how it works" slide's content.
+private struct HowItWorksSlide: Identifiable {
+    let id: Int
+    let symbol: String
+    let headline: String
+    let line: String
+}
+
+/// A swipeable, paged carousel of green cards that teaches the SafeSide flow
+/// (scan → sourced score → better swap). Built on a paged `TabView` with the
+/// default dots hidden, plus a custom dot row so the dots use our green /
+/// greenSoft tokens (brief). Auto-advance is deliberately slow (7s) and fully
+/// disabled under Reduce Motion — manual swipe always works. The card frame is
+/// `@ScaledMetric` so it grows with Dynamic Type instead of clipping (§7).
+private struct HowItWorksCarousel: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var page = 0
+    @ScaledMetric(relativeTo: .body) private var cardHeight: CGFloat = 168
+
+    // A slow, calm auto-advance — gated on Reduce Motion inside `onReceive`.
+    private let autoAdvance = Timer.publish(every: 7, on: .main, in: .common).autoconnect()
+
+    private let slides: [HowItWorksSlide] = [
+        HowItWorksSlide(
+            id: 0, symbol: "barcode.viewfinder",
+            headline: "Scan any barcode",
+            line: "Point your camera, get a result in seconds."
+        ),
+        HowItWorksSlide(
+            id: 1, symbol: "checkmark.seal",
+            headline: "See a sourced score",
+            line: "Every number cited, dose-aware — no black box."
+        ),
+        HowItWorksSlide(
+            id: 2, symbol: "arrow.triangle.2.circlepath",
+            headline: "Swap for a better option",
+            line: "A better choice in the same category."
+        )
+        // TODO(home-later): featured product slide — a real curated pick
+        // (image + name + our sourced score + "See why"). Intentionally omitted
+        // until we actually have a featured product; we never fake one.
+        // HowItWorksSlide(id: 3, symbol: "star", headline: "This week's pick",
+        //     line: "A high-scoring product we like right now."),
+    ]
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Theme.Space.s4) {
-                ZStack {
-                    Circle().fill(Theme.onGreen.opacity(0.18)).frame(width: iconCircle, height: iconCircle)
-                    Image(systemName: "barcode.viewfinder")
-                        .font(.system(size: iconGlyph, weight: .semibold))
-                        .foregroundStyle(Theme.onGreen)
+        VStack(spacing: Theme.Space.s3) {
+            TabView(selection: $page) {
+                ForEach(slides) { slide in
+                    HowItWorksCardView(slide: slide)
+                        .tag(slide.id)
                 }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Scan a product")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(Theme.onGreen)
-                    Text("Get a clear, sourced score")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.onGreen.opacity(0.85))
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.onGreen.opacity(0.8))
             }
-            .padding(Theme.Space.s5)
-            .frame(maxWidth: .infinity, minHeight: 96)
-            .background(Theme.greenDeep, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: cardHeight)
+            .onReceive(autoAdvance) { _ in
+                // Reduce Motion → no auto-advance at all (manual swipe stands).
+                guard !reduceMotion else { return }
+                withAnimation(Motion.standard) {
+                    page = (page + 1) % slides.count
+                }
+            }
+
+            dotRow
         }
-        .buttonStyle(CardPressButtonStyle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Scan a product")
-        .accessibilityHint("Opens the scanner to scan a barcode and get a clear, sourced score.")
+    }
+
+    /// Custom dots in the brand tokens: active = `green`, inactive = `greenSoft`.
+    /// Purely decorative — the slides themselves are the VoiceOver elements.
+    private var dotRow: some View {
+        HStack(spacing: Theme.Space.s2) {
+            ForEach(slides) { slide in
+                Circle()
+                    .fill(slide.id == page ? Theme.green : Theme.greenSoft)
+                    .frame(width: 7, height: 7)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
-// MARK: - Search field row (Home entry point → Search screen)
-
-/// A tappable field-styled row under the hero (SCREEN_SPECS §Home item 1):
-/// magnifier glyph + "Search any product…" placeholder text. NOT an editable
-/// field — a button that looks like one, so Home keeps its single-focus
-/// hierarchy and the actual field lives on the pushed Search screen (Oasis
-/// STEAL #22). The glyph scales with Dynamic Type (Chunk-0 `@ScaledMetric`).
-private struct SearchFieldRow: View {
-    @ScaledMetric(relativeTo: .body) private var glyph: CGFloat = 17
+/// A single green showcase card: an icon in a translucent disc, a Space Grotesk
+/// headline, and one calm supporting line. `greenDeep` fill keeps the white
+/// text AA-legible (§7). Combined into one VoiceOver element per card.
+private struct HowItWorksCardView: View {
+    let slide: HowItWorksSlide
+    @ScaledMetric(relativeTo: .title3) private var iconCircle: CGFloat = 48
+    @ScaledMetric(relativeTo: .title3) private var iconGlyph: CGFloat = 22
 
     var body: some View {
-        HStack(spacing: Theme.Space.s3) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: glyph, weight: .semibold))
-                .foregroundStyle(Theme.textSecondary)
-            Text("Search any product…")
-                .font(.body)
-                .foregroundStyle(Theme.textSecondary)
+        VStack(alignment: .leading, spacing: Theme.Space.s3) {
+            ZStack {
+                Circle().fill(Theme.onGreen.opacity(0.18))
+                    .frame(width: iconCircle, height: iconCircle)
+                Image(systemName: slide.symbol)
+                    .font(.system(size: iconGlyph, weight: .semibold))
+                    .foregroundStyle(Theme.onGreen)
+            }
+            .accessibilityHidden(true)
+
             Spacer(minLength: 0)
+
+            Text(slide.headline)
+                .font(.display(20, weight: .bold, relativeTo: .title3))
+                .foregroundStyle(Theme.onGreen)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(slide.line)
+                .font(.subheadline)
+                .foregroundStyle(Theme.onGreen.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, Theme.Space.s4)
-        .frame(minHeight: 52)
+        .padding(Theme.Space.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .surfaceCard(padded: false)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Search any product")
-        .accessibilityAddTraits(.isButton)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.greenDeep, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        // A little inset so the paged card's rounded edges + shadow don't clip
+        // against the TabView's page bounds.
+        .padding(.horizontal, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(slide.headline). \(slide.line)")
+    }
+}
+
+// MARK: - Quick-action tile
+
+/// One calm greenSoft shortcut tile: a green SF Symbol over a short label,
+/// matching the Categories row tiles + Scan chrome. Presentational — the parent
+/// `Button`/`NavigationLink` owns the tap + accessibility label.
+private struct QuickActionTileLabel: View {
+    let icon: String
+    let label: String
+    @ScaledMetric(relativeTo: .title3) private var glyph: CGFloat = 22
+
+    var body: some View {
+        VStack(spacing: Theme.Space.s2) {
+            Image(systemName: icon)
+                .font(.system(size: glyph, weight: .semibold))
+                .foregroundStyle(Theme.greenDeep)
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 72)
+        .padding(.vertical, Theme.Space.s2)
+        .background(Theme.greenSoft, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .accessibilityHidden(true)
     }
 }
 
@@ -429,6 +587,7 @@ private struct DailyInsightTile: View {
 
             Text(text)
                 .font(.subheadline.weight(.semibold))
+                .monospacedDigit()   // count doesn't jitter as it changes (audit)
                 .foregroundStyle(Theme.textPrimary)
 
             Spacer(minLength: 0)
@@ -494,6 +653,7 @@ private struct GradeDot: View {
             Circle().fill(bandColor(band)).frame(width: diameter * scale, height: diameter * scale)
             Text(score.map(String.init) ?? "—")
                 .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
+                .monospacedDigit()   // scores align disc-to-disc in the grid (audit)
                 .foregroundStyle(Theme.ResultScreen.textOnBandFill(band))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)

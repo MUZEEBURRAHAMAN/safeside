@@ -84,10 +84,12 @@ extension View {
     }
 
     /// Standard surface card: white fill, `radius.md`, hairline border, `space.4`
-    /// padding. FLAT by design (§4 "flat by default") — no drop shadow; the
-    /// white card reads against the tinted canvas via the border alone. The one
-    /// true card container so every panel matches (§5.4). `padded: false` to
-    /// supply your own padding.
+    /// padding, plus the v3 "floating card" soft shadow. DESIGN_SYSTEM_V3 §4/§8.1
+    /// (and the 2026-07-11 UI audit "Home top win") supersede the old "flat by
+    /// default" rule: white cards now lift off the tinted canvas with a soft,
+    /// low shadow (`y:6, blur:20, ~6% black`) *and* the hairline border together
+    /// — the Ingrex/Oasis look. Subtle, never heavy. The one true card container
+    /// so every panel matches (§5.4). `padded: false` to supply your own padding.
     func surfaceCard(padded: Bool = true) -> some View {
         self
             .padding(padded ? Theme.Space.s4 : 0)
@@ -96,5 +98,6 @@ extension View {
                 RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .strokeBorder(Theme.border, lineWidth: 1)
             )
+            .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 6)
     }
 }

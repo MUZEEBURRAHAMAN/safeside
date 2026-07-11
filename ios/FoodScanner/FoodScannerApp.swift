@@ -142,22 +142,33 @@ struct FoodScannerApp: App {
     }
 }
 
+/// The app's top-level tabs. A `Hashable` enum (not implicit indices) so Home's
+/// quick-action tiles can programmatically switch tabs via a shared selection
+/// binding — e.g. the "Categories" tile jumps to the Categories tab rather than
+/// pushing a second `NavigationStack` inside Home's own stack.
+enum RootTab: Hashable { case home, scan, categories, me }
+
 /// 4-tab shell (docs/DESIGN_SYSTEM §5.7). Scan is the primary action.
 struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AnalyticsLogger.self) private var analytics
     @Environment(FeedbackGate.self) private var feedbackGate
+    @State private var selection: RootTab = .home
 
     var body: some View {
         // @Bindable so the sentiment gate's `shouldPrompt` can drive a sheet.
         @Bindable var gate = feedbackGate
-        TabView {
-            HomeView()
+        TabView(selection: $selection) {
+            // Home's quick-action grid can hop to another tab (Categories) via
+            // this closure — the honest, non-nested route from Home.
+            HomeView(onSelectTab: { selection = $0 })
                 .tabItem { Label("Home", systemImage: "house") }
+                .tag(RootTab.home)
 
             // Center/primary in the IA; simple tab here for Phase 0.
             NavigationStack { ScanScreen() }
                 .tabItem { Label("Scan", systemImage: "barcode.viewfinder") }
+                .tag(RootTab.scan)
 
             // Categories replaces Plan in the bar for now (Home · Categories ·
             // Scan · Me). PlanView stays in the codebase and in the DEBUG
@@ -167,9 +178,11 @@ struct RootTabView: View {
             //   PlanView().tabItem { Label("Plan", systemImage: "calendar") }
             CategoriesView()
                 .tabItem { Label("Categories", systemImage: "square.grid.2x2") }
+                .tag(RootTab.categories)
 
             MeView()
                 .tabItem { Label("Me", systemImage: "person") }
+                .tag(RootTab.me)
         }
         // Presented from the tab shell (never the onboarding fullScreenCover),
         // so the gate structurally cannot appear mid-onboarding.
