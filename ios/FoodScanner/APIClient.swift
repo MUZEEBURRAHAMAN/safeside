@@ -225,7 +225,10 @@ struct APIClient {
 
     /// AI ingredient explanations for a product (cached backend; see AI_INGREDIENT_EXPLANATION.md).
     func ingredients(productID: String) async throws -> [Ingredient] {
-        try await request("product/\(productID)/ingredients")
+        // Supabase edge functions route by function NAME (first path segment),
+        // so this must hit the `ingredients` function — NOT `product/:id/...`,
+        // which lands on the `product` function and 400s (barcode parse).
+        try await request("ingredients/product/\(productID)/ingredients")
     }
 
     /// Ranked, restriction-safe better options in the same category
