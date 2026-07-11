@@ -2,13 +2,37 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+/// The Oasis-style capture modes surfaced in the segmented pill under the
+/// wordmark. We ship **two** (Barcode · Photo) rather than Oasis's three:
+/// SafeSide has no "Shelf" shelf-scan capability, and a dead/disabled third
+/// segment would be a dead-end (CLAUDE.md principle #4) and dishonest chrome —
+/// the two-segment pill still reproduces Oasis's structure exactly.
+///
+/// - `.barcode` → the live `AVCaptureMetadataOutput` barcode detection.
+/// - `.photo` → on-device Vision OCR of the ingredients label (shutter) plus
+///   the gallery picker — the same OCR path the `needsOCR` fallback uses.
+enum ScanMode: CaseIterable {
+    case barcode, photo
+
+    var title: String { self == .barcode ? "Barcode" : "Photo" }
+    var icon: String { self == .barcode ? "barcode" : "camera.fill" }
+    /// COPY_DECK voice — the instruction line just below the reticle, per mode.
+    var instruction: String {
+        self == .barcode
+            ? "Point your camera at a barcode."
+            : "Point your camera at the ingredients label."
+    }
+}
+
 /// Aim guidance drawn above the live camera feed (`ScannerView`'s
-/// `CameraViewController`) — docs/DESIGN_SYSTEM_V3.md §5.9 ("the dark brand
-/// moment"): a centered, brand-green corner-bracket reticle that locks solid
-/// the instant a barcode is caught, a dimmed surround so users know where to
-/// point the camera, a top instruction pill, a trailing-edge control cluster
-/// (zoom / gallery / torch — see `controlCluster` below), and the scan-success
-/// "shatter" flourish (see `ShatterOverlay`).
+/// `CameraViewController`) — Oasis-structured, DESIGN_SYSTEM_V3.md §5.9 ("the
+/// dark brand moment"): a top-center SafeSide wordmark, a `Barcode · Photo`
+/// segmented mode pill under it, a centered white rounded-corner bracket
+/// reticle that locks brand-green the instant a barcode is caught, a dimmed
+/// surround, a mode-aware instruction line just below the reticle, a co-located
+/// "Reading…" loading pill just *above* the reticle, a trailing-edge control
+/// cluster (zoom / gallery / torch — see `controlCluster`), a Photo-mode
+/// shutter, and the scan-success "shatter" flourish (see `ShatterOverlay`).
 ///
 /// Zoom and torch are driven through `captureHandle` (`ScannerCaptureBridge`)
 /// rather than grabbing an independent `AVCaptureDevice` — that's the fix for
@@ -25,6 +49,10 @@ import UIKit
 /// every phase, so a re-aim after an error or "not found" always works.
 struct ScanOverlay: View {
     let phase: ScanViewModel.Phase
+    /// The active capture mode (owned by `ScanScreen` so it can gate live
+    /// barcode processing when the user is in Photo mode). Drives the
+    /// segmented pill's selection, the instruction line, and the shutter.
+    @Binding var mode: ScanMode
     /// Bridges to the live `CameraViewController` for zoom/torch — see the
     /// type header above.
     let captureHandle: ScannerCaptureBridge
@@ -34,6 +62,15 @@ struct ScanOverlay: View {
     /// caller (`ScanScreen`) owns everything past that point (loading the
     /// image, running Vision, hitting the backend) via `ScanViewModel`.
     let onPhotoPicked: (PhotosPickerItem) -> Void
+    /// Fired when the Photo-mode shutter is tapped — runs the on-device OCR
+    /// capture path (`ScanViewModel.captureLabel`), wired up by `ScanScreen`.
+    let onCaptureLabel: () -> Void
+    /// True safe-area insets captured by `ScanScreen` *before* the overlay's
+    /// `.ignoresSafeArea()` — the inner `GeometryReader` reports 0 insets once
+    /// the overlay is full-bleed, so top chrome / bottom shutter would collide
+    /// with the Dynamic Island / home indicator without these.
+    var topInset: CGFloat = 0
+    var bottomInset: CGFloat = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sweepOffset: CGFloat = 0
@@ -47,12 +84,23 @@ struct ScanOverlay: View {
     private let reticleSize: CGFloat = 240
 
     private var isLocked: Bool { phase == .lookingUp }
-    // The lookingUp/error/needsOCR states already surface their own text via
-    // ScanScreen's bottom banner — only show the instruction pill and the
-    // control cluster for plain idle scanning, so we never stack the cluster
-    // (or a second message) on top of a banner.
-    private var showsInstruction: Bool { phase == .scanning }
+    // Only show the reticle instruction, the control cluster, and the Photo
+    // shutter for plain idle scanning — the lookingUp/needsOCR/error states
+    // surface their own text (loading pill above the reticle, or ScanScreen's
+    // bottom banner), so we never stack a second message over them.
     private var showsControlCluster: Bool { phase == .scanning }
+    private var showsShutter: Bool { mode == .photo && phase == .scanning }
+    /// Co-located "Reading…" caption shown just *above* the reticle at the
+    /// moment of capture (UI_UX_AUDIT §Scanner HIGH — the confirmation must sit
+    /// with the reticle that just locked, not a screen-height away at the
+    /// bottom). `nil` in every non-loading phase.
+    private var loadingText: String? {
+        switch phase {
+        case .lookingUp:      return mode == .photo ? "Reading the label…" : "Reading the barcode…"
+        case .capturingLabel: return "Reading the label…"
+        default:              return nil
+        }
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -67,23 +115,45 @@ struct ScanOverlay: View {
                     .position(center)
                     .accessibilityHidden(true)
 
-                // Instruction pill sits just BELOW the reticle (not at the top,
-                // where it collided with the nav bar). Positioned relative to
-                // the reticle so it tracks the frame on every device.
-                if showsControlCluster {
+                // "Reading…" caption co-located just ABOVE the reticle that
+                // locked (UI_UX_AUDIT §Scanner HIGH), not pinned to the bottom.
+                if let loadingText {
+                    loadingPill(loadingText)
+                        .position(x: center.x,
+                                  y: center.y - reticleSize / 2 - Theme.Space.s6)
+                }
+
+                // Mode-aware instruction sits just BELOW the reticle, tracking
+                // the frame on every device (Oasis: plain white text, no plate).
+                if phase == .scanning {
                     instructionLabel
                         .position(x: center.x,
                                   y: center.y + reticleSize / 2 + Theme.Space.s6)
                         .accessibilityAddTraits(.isStaticText)
                 }
 
+                // Top-center chrome: SafeSide wordmark + segmented mode pill,
+                // pinned to the top safe area (nav bar is hidden on this state).
+                VStack(spacing: Theme.Space.s3) {
+                    wordmark
+                    modePill
+                }
+                .padding(.top, topInset + Theme.Space.s2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
                 if showsControlCluster {
                     controlCluster
-                        // Same safe-area-aware trick as topBar above, but for
-                        // the trailing edge — pins ~16pt clear of the edge on
-                        // every device instead of guessing a fixed inset.
+                        // Pins ~16pt clear of the trailing edge on every device
+                        // instead of guessing a fixed inset.
                         .padding(.trailing, proxy.safeAreaInsets.trailing + Theme.Space.s4)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                }
+
+                // Photo-mode shutter, bottom-center (Oasis Photo capture).
+                if showsShutter {
+                    shutterButton
+                        .padding(.bottom, bottomInset + Theme.Space.s6)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
 
                 // On top of everything else in this overlay — the "whole
@@ -106,16 +176,95 @@ struct ScanOverlay: View {
         }
     }
 
-    // MARK: - Top bar (instruction pill)
+    // MARK: - Top-center wordmark + segmented mode pill (Oasis structure)
 
-    private var topBar: some View {
-        HStack(spacing: Theme.Space.s3) {
-            Spacer(minLength: 0)
-            if showsInstruction {
-                instructionLabel
-            }
-            Spacer(minLength: 0)
+    /// The SafeSide wordmark, top-center, mirroring Oasis's title placement.
+    /// Space Grotesk (`Font.display`) with a brand-green glyph accent; the
+    /// wordmark text stays white for legibility over a live camera (pure-green
+    /// text over variable camera content risks WCAG AA — the green is carried
+    /// by the glyph, per the task's "accents in our green" + legibility rule).
+    private var wordmark: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Theme.green)
+            Text("SafeSide")
+                .font(.display(20, weight: .bold, relativeTo: .title3))
+                .foregroundStyle(Theme.onGreen)
         }
+        .shadow(color: Color.black.opacity(0.4), radius: 4, y: 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityLabel("SafeSide")
+    }
+
+    /// Dark translucent segmented pill (Barcode · Photo). Active segment = white
+    /// fill with ink text + leading icon; inactive = white text on the dark
+    /// pill — matching Oasis. Brand green is intentionally *not* the active
+    /// fill here (it lives in the wordmark glyph + reticle lock); a white active
+    /// segment reads cleanest over a live camera.
+    private var modePill: some View {
+        HStack(spacing: 4) {
+            ForEach(ScanMode.allCases, id: \.self) { modeSegment($0) }
+        }
+        .padding(4)
+        .background(Theme.ink.opacity(0.55), in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.onGreen.opacity(0.15), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.25), radius: 8, y: 2)
+    }
+
+    private func modeSegment(_ segment: ScanMode) -> some View {
+        let active = mode == segment
+        return Button {
+            withAnimation(Motion.respecting(Motion.quick, reduceMotion)) { mode = segment }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: segment.icon).font(.footnote.weight(.bold))
+                Text(segment.title).font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(active ? Theme.ink : Theme.onGreen)
+            .padding(.horizontal, Theme.Space.s4)
+            .padding(.vertical, Theme.Space.s2)
+            .background { if active { Capsule().fill(Theme.onGreen) } }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(segment.title) mode")
+        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+    }
+
+    // MARK: - Photo-mode shutter
+
+    /// A camera-style shutter that runs the on-device OCR capture path — the
+    /// Photo-mode equivalent of the live barcode auto-detection.
+    private var shutterButton: some View {
+        Button(action: onCaptureLabel) {
+            ZStack {
+                Circle().fill(Theme.onGreen.opacity(0.25)).frame(width: 76, height: 76)
+                Circle().strokeBorder(Theme.onGreen, lineWidth: 4).frame(width: 72, height: 72)
+                Circle().fill(Theme.onGreen).frame(width: 58, height: 58)
+            }
+        }
+        .shadow(color: Color.black.opacity(0.3), radius: 6, y: 2)
+        .accessibilityLabel("Capture the label")
+        .accessibilityHint("Takes a photo of the ingredients label and reads it.")
+    }
+
+    // MARK: - Loading pill (co-located above the reticle)
+
+    /// Calm "Reading…" capsule — the same `Theme.forest` styling as the
+    /// instruction treatment, shown just above the locked reticle.
+    private func loadingPill(_ text: String) -> some View {
+        HStack(spacing: Theme.Space.s2) {
+            ProgressView().tint(Theme.onGreen)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(Theme.onGreen)
+        }
+        .padding(.vertical, Theme.Space.s2)
+        .padding(.horizontal, Theme.Space.s4)
+        .background(Theme.forest.opacity(0.92), in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Dimmed surround
@@ -143,9 +292,16 @@ struct ScanOverlay: View {
 
     private var reticle: some View {
         ZStack {
+            // Oasis reticle = white rounded-corner brackets for camera
+            // legibility; SafeSide's brand accent is the lock state, which
+            // snaps to green + a green glow the instant a barcode is caught.
+            // A soft black shadow at rest keeps the white lines readable over a
+            // bright camera background (WCAG AA over variable content).
             ReticleCorners()
-                .stroke(Theme.green, style: StrokeStyle(lineWidth: isLocked ? 6 : 3.5, lineCap: .round, lineJoin: .round))
-                .shadow(color: isLocked ? Theme.green.opacity(0.55) : .clear, radius: isLocked ? 14 : 0)
+                .stroke(isLocked ? Theme.green : Theme.onGreen,
+                        style: StrokeStyle(lineWidth: isLocked ? 6 : 4, lineCap: .round, lineJoin: .round))
+                .shadow(color: isLocked ? Theme.green.opacity(0.55) : Color.black.opacity(0.35),
+                        radius: isLocked ? 14 : 4)
             if !reduceMotion && !isLocked {
                 sweepLine
                     .frame(width: reticleSize - 24, height: 2)
@@ -177,15 +333,17 @@ struct ScanOverlay: View {
 
     // MARK: - Instruction
 
+    /// Mode-aware instruction just below the reticle — Oasis renders this as
+    /// plain white text (no plate); a soft shadow keeps it legible over a
+    /// bright camera background (WCAG AA over variable content).
     private var instructionLabel: some View {
-        Text("Point your camera at a barcode.")
-            .font(.subheadline.weight(.medium))
+        Text(mode.instruction)
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(Theme.onGreen)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, Theme.Space.s4)
-            .padding(.vertical, Theme.Space.s3)
-            .background(Theme.forest.opacity(0.85), in: Capsule())
+            .padding(.horizontal, Theme.Space.s5)
+            .shadow(color: Color.black.opacity(0.5), radius: 4, y: 1)
     }
 
     // MARK: - Control cluster (founder request: vertical pill, trailing edge,
@@ -224,6 +382,7 @@ struct ScanOverlay: View {
         Button(action: cycleZoom) {
             Text(zoomLabel(zoomFactor))
                 .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
                 .foregroundStyle(Theme.onGreen)
                 .frame(width: 44, height: 44)
         }
@@ -280,28 +439,39 @@ struct ScanOverlay: View {
 }
 
 /// Scan-bracket corners (docs/DESIGN_SYSTEM.md §10.4 motif) — four L-shaped
-/// marks rather than a full rounded-rect border, echoing the brand's
-/// "scan brackets" iconography instead of a generic camera frame.
+/// marks with *rounded* elbows, forming a rounded-square reticle exactly like
+/// Oasis's, rather than a full border or a sharp L. Each elbow is a quarter
+/// arc of `cornerRadius`; `cornerLength` is the total reach of each leg.
 private struct ReticleCorners: Shape {
-    var cornerLength: CGFloat = 28
+    var cornerLength: CGFloat = 34
+    var cornerRadius: CGFloat = 16
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
+        let r = cornerRadius
         // Top-left
         path.move(to: CGPoint(x: rect.minX, y: rect.minY + cornerLength))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.minY),
+                          control: CGPoint(x: rect.minX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.minX + cornerLength, y: rect.minY))
         // Top-right
         path.move(to: CGPoint(x: rect.maxX - cornerLength, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + r),
+                          control: CGPoint(x: rect.maxX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cornerLength))
         // Bottom-right
         path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - cornerLength))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - r, y: rect.maxY),
+                          control: CGPoint(x: rect.maxX, y: rect.maxY))
         path.addLine(to: CGPoint(x: rect.maxX - cornerLength, y: rect.maxY))
         // Bottom-left
         path.move(to: CGPoint(x: rect.minX + cornerLength, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - r),
+                          control: CGPoint(x: rect.minX, y: rect.maxY))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cornerLength))
         return path
     }
