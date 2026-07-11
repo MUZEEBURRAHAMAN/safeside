@@ -228,7 +228,14 @@ struct APIClient {
         // Supabase edge functions route by function NAME (first path segment),
         // so this must hit the `ingredients` function — NOT `product/:id/...`,
         // which lands on the `product` function and 400s (barcode parse).
-        try await request("ingredients/product/\(productID)/ingredients")
+        // The endpoint wraps the array as `{ "ingredients": [...] }`.
+        let resp: IngredientsResponse =
+            try await request("ingredients/product/\(productID)/ingredients")
+        return resp.ingredients
+    }
+
+    private struct IngredientsResponse: Decodable {
+        let ingredients: [Ingredient]
     }
 
     /// Ranked, restriction-safe better options in the same category
