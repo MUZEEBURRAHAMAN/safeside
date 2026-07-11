@@ -46,7 +46,20 @@ struct FoodScannerApp: App {
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "me" {
                 harness { MeView() }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "plan" {
+                // Kept for the screenshot matrix — PlanView stays in the code
+                // even though its tab item is retired. TODO(categories-later):
+                // restore the Plan tab.
                 harness { PlanView() }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "categories" {
+                harness { CategoriesView() }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "categorydetail" {
+                // Seeded to Sodas & colas — the densest real cohort (Coke / Zero
+                // / water), so the ranked-list screenshot shows real data.
+                harness {
+                    NavigationStack {
+                        CategoryDetailView(category: FoodCategory.all[0])
+                    }
+                }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "home" {
                 harness { NavigationStack { HomeView() } }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "search" {
@@ -146,8 +159,14 @@ struct RootTabView: View {
             NavigationStack { ScanScreen() }
                 .tabItem { Label("Scan", systemImage: "barcode.viewfinder") }
 
-            PlanView()
-                .tabItem { Label("Plan", systemImage: "square.grid.2x2") }
+            // Categories replaces Plan in the bar for now (Home · Categories ·
+            // Scan · Me). PlanView stays in the codebase and in the DEBUG
+            // harness (SHOW_SCREEN=plan).
+            // TODO(categories-later): restore the Plan tab (5th slot, or swap
+            // back) — its view is unchanged, only its `.tabItem` is retired:
+            //   PlanView().tabItem { Label("Plan", systemImage: "calendar") }
+            CategoriesView()
+                .tabItem { Label("Categories", systemImage: "square.grid.2x2") }
 
             MeView()
                 .tabItem { Label("Me", systemImage: "person") }

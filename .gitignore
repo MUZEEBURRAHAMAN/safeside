@@ -20,3 +20,8 @@ ios/Generated/
 
 # Claude Code session/memory scratch (not app source)
 .claude/projects/
+
+# Xcode build output from -derivedDataPath ./build (worktree agents)
+ios/build/
+# Agent worktrees (embedded repos)
+.claude/worktrees/
