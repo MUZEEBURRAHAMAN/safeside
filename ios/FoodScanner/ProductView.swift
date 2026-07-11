@@ -145,8 +145,19 @@ struct ProductView: View {
         .background(Theme.canvas)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Centered SafeSide wordmark in Space Grotesk/green (Oasis's centered
+            // wordmark, our brand).
+            ToolbarItem(placement: .principal) {
+                Text("SafeSide")
+                    .font(Font.display(20, weight: .bold, relativeTo: .headline))
+                    .foregroundStyle(Theme.greenDeep)
+                    .accessibilityAddTraits(.isHeader)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 favoriteButton
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                shareButton
             }
             ToolbarItem(placement: .topBarTrailing) {
                 overflowMenu
@@ -197,34 +208,38 @@ struct ProductView: View {
     /// The full result layout (everything but the loading skeleton), in
     /// SCREEN_SPECS §4 top→bottom order.
     private var resultContent: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s5) {
+        VStack(alignment: .leading, spacing: Theme.Space.s6) {
             identityHeader
                 .opacity(identityVisible ? 1 : 0)
                 .scaleEffect(identityVisible ? 1 : 0.97)
                 .onAppear { revealIdentity() }
 
+            // Safety first: the flagged-allergen banner (only when a scanned
+            // product contains something the user asked to avoid).
             allergenAlertBannerOrNone
 
-            triMetricSectionOrNone
+            // Oasis's icon·label·value·dot quick-fact block — mapped onto our
+            // real data (Beneficial / Additives / Processing / Allergens / Brand).
+            QuickFactsSection(facts: quickFacts)
 
-            // Watch-outs / Benefits bar-meters — real per-100 g values from
-            // score.highlights (backend-computed). Each renders only when its
-            // array is non-empty; the meters visually absorb the factor rows
-            // while "Why this score" keeps the full sourced breakdown below.
+            // Allergen chip detail (only when the product lists allergens).
+            allergensSection
+
+            // "What's inside N" — the Oasis bordered ingredient cards.
+            ingredientsSection
+
+            // Our transparency moat, kept within the Oasis structure: the sourced
+            // "Why this score" factor breakdown + the Watch-outs / Benefits meters
+            // (real per-100 g values from score.highlights, backend-computed).
+            whyScoreOrNote
+
             if let highlights {
                 MetersSection(title: "Watch-outs", rows: highlights.watchOuts)
                 MetersSection(title: "Benefits", rows: highlights.benefits)
             }
 
-            whyScoreOrNote
-
-            ingredientPreReadOrNone
-
-            AdditivesSummarySection(ingredients: displayIngredients)
-
-            ingredientsSection
-
-            allergensSection
+            // "Other info" — product provenance/meta as Oasis-style stat tiles.
+            OtherInfoSection(product: workingProduct)
 
             if !allSources.isEmpty {
                 SourcesSection(sources: allSources, fetchedDate: workingProduct.fetchedAt)
@@ -256,19 +271,6 @@ struct ProductView: View {
         .padding(.vertical, Theme.Space.s5)
     }
 
-    /// Calm pre-read above the ingredient list. Hidden when both counts are 0
-    /// and there are no ingredients (never a "0 · 0" row on a thin product).
-    @ViewBuilder
-    private var ingredientPreReadOrNone: some View {
-        if let highlights,
-           highlights.toKnowAboutCount > 0 || highlights.beneficialCount > 0 || !displayIngredients.isEmpty {
-            IngredientCountPreRead(
-                toKnowAboutCount: highlights.toKnowAboutCount,
-                beneficialCount: highlights.beneficialCount
-            )
-        }
-    }
-
     /// 1) Floating product image · 2) name/brand + score ring · 3) trust
     /// chips. Reflows to a vertical stack at accessibility Dynamic Type
     /// sizes instead of clipping the ring against the title (§7).
@@ -283,12 +285,12 @@ struct ProductView: View {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: Theme.Space.s3) {
                     titleBlock
-                    ScoreBadge(score: workingProduct.score?.score, band: band)
+                    scoreRingBlock
                 }
             } else {
-                HStack(alignment: .center, spacing: Theme.Space.s4) {
+                HStack(alignment: .top, spacing: Theme.Space.s4) {
                     titleBlock
-                    ScoreBadge(score: workingProduct.score?.score, band: band)
+                    scoreRingBlock
                 }
             }
 
@@ -296,31 +298,134 @@ struct ProductView: View {
         }
     }
 
+    /// The ring + the plain-language verdict WORD beneath it (audit #1 Result
+    /// fix — Oasis pairs "68/100" with "Okay"). Ring carries number + arc; the
+    /// verdict word carries the meaning in AA-legible ink.
+    private var scoreRingBlock: some View {
+        VStack(spacing: Theme.Space.s2) {
+            ScoreBadge(score: workingProduct.score?.score, band: band)
+            ScoreVerdictLabel(band: band)
+                .frame(maxWidth: 132)
+        }
+    }
+
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            // Space Grotesk on the product name (audit typography fix / §3).
             Text(workingProduct.name)
-                .font(.title2.weight(.bold))
+                .font(Font.display(26, weight: .bold, relativeTo: .title2))
                 .foregroundStyle(Theme.textPrimary)
-                .lineLimit(2)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
-            if let brand = workingProduct.brand, !brand.isEmpty {
-                Text(brand)
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.textSecondary)
-            }
+            brandView
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 3) Category/data-source + confidence trust chips. There's no product
-    /// category in `Models.swift` today, so this deliberately shows only the
-    /// two chips we have real data for — the data source and the confidence
-    /// grade — rather than inventing a category label.
+    /// Brand as an underlined link (Oasis pattern). When we have the barcode we
+    /// link to the product's Open Food Facts page — an honest, real destination
+    /// (our source), never a dead link; otherwise it's plain underlined text.
+    @ViewBuilder
+    private var brandView: some View {
+        if let brand = workingProduct.brand, !brand.isEmpty {
+            if let barcode = workingProduct.barcode, !barcode.isEmpty,
+               let url = URL(string: "https://world.openfoodfacts.org/product/\(barcode)") {
+                Link(destination: url) {
+                    Text(brand).underline()
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Theme.greenDeep)
+                .accessibilityHint("Opens this product on Open Food Facts")
+            } else {
+                Text(brand)
+                    .underline()
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    /// The Oasis chip row: a green "sourced" chip (their "tested" chip mapped to
+    /// our honest provenance) + the confidence grade. No product category exists
+    /// in `Models.swift`, so we never invent a category pill.
     private var trustChipsRow: some View {
         FlowLayout(spacing: Theme.Space.s2) {
-            SourceChip(name: "Open Food Facts")
+            SourcedChip()
             ConfidenceChip(confidence: workingProduct.score?.confidence ?? workingProduct.dataConfidence)
         }
+    }
+
+    /// Oasis's Beneficial / PFAS / Contaminants / Owned-by rows, mapped onto OUR
+    /// real data — no fabricated PFAS/contaminant rows. Every row is built only
+    /// when we actually hold the value; counts come from `score.highlights` and
+    /// the ingredient list (never counted or re-derived on the client for the
+    /// meters — highlights are backend-owned).
+    private var quickFacts: [QuickFact] {
+        var facts: [QuickFact] = []
+
+        // Beneficial — backend-computed count from score.highlights.
+        if let highlights {
+            facts.append(QuickFact(
+                icon: "leaf.fill",
+                label: "Beneficial",
+                value: "\(highlights.beneficialCount)",
+                dotColor: highlights.beneficialCount > 0 ? Theme.scoreHigh : Theme.scoreUnknown
+            ))
+        }
+
+        // Additives — count of ingredients carrying an INS-class category,
+        // dot tinted by the worst additive tier present.
+        let additives = displayIngredients.filter { $0.category != nil }
+        if !additives.isEmpty {
+            facts.append(QuickFact(
+                icon: "flask.fill",
+                label: "Additives",
+                value: "\(additives.count)",
+                dotColor: worstAdditiveDot(additives)
+            ))
+        }
+
+        // Processing — NOVA group / short processing word from the Processing
+        // factor, dot tinted by that factor's band.
+        if let processing = workingProduct.score?.factors.first(where: {
+            $0.name.caseInsensitiveCompare("Processing") == .orderedSame
+        }) {
+            facts.append(QuickFact(
+                icon: "gearshape.fill",
+                label: "Processing",
+                value: processingFactValue(processing),
+                dotColor: ScoreBand.from(score: processing.subScore).tint
+            ))
+        }
+
+        // Allergens — count present (or "None"); amber when present, clay when a
+        // flagged one matches the user's profile.
+        let allergenCount = workingProduct.allergens.count
+        facts.append(QuickFact(
+            icon: "exclamationmark.shield.fill",
+            label: "Allergens",
+            value: allergenCount == 0 ? "None" : "\(allergenCount)",
+            dotColor: allergenCount == 0
+                ? Theme.scoreHigh
+                : (flaggedAllergenMatches.isEmpty ? Theme.scoreMid : Theme.scoreLow)
+        ))
+
+        // Brand — Oasis's "Owned by" row (no chevron: we have no brand page,
+        // and the underlined brand link up top already reaches Open Food Facts).
+        if let brand = workingProduct.brand, !brand.isEmpty {
+            facts.append(QuickFact(icon: "building.2.fill", label: "Brand", value: brand))
+        }
+
+        return facts
+    }
+
+    /// The dot color for the Additives quick-fact — the worst tier present,
+    /// mapped to our calm band palette (never alarm red; clay is our "higher").
+    private func worstAdditiveDot(_ additives: [Ingredient]) -> Color {
+        let tiers = Set(additives.compactMap { $0.riskTier?.lowercased() })
+        if tiers.contains("higher") { return Theme.scoreLow }
+        if tiers.contains("moderate") { return Theme.scoreMid }
+        return Theme.scoreHigh
     }
 
     /// Brand-tinted (not alarm-colored) heart toggle, in the nav bar per the
@@ -339,6 +444,28 @@ struct ProductView: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+    }
+
+    /// Share (Oasis nav bar has bookmark + share). Shares a calm, honest
+    /// one-line summary — name, brand, and our sourced score — never a
+    /// judgmental verdict, per the ED-safe copy voice.
+    private var shareButton: some View {
+        ShareLink(item: shareSummary) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.greenDeep)
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Share this product")
+    }
+
+    private var shareSummary: String {
+        var parts = [workingProduct.name]
+        if let brand = workingProduct.brand, !brand.isEmpty { parts.append("by \(brand)") }
+        if let score = workingProduct.score {
+            parts.append("— \(score.score)/100, \(score.band.label) (via SafeSide)")
+        }
+        return parts.joined(separator: " ")
     }
 
     /// Overflow menu — currently the Compare entry (SCREEN_SPECS §10). Kept as
@@ -397,17 +524,7 @@ struct ProductView: View {
         }
     }
 
-    /// 4) Tri-metric row — only shown once we actually have factor data, so
-    /// it never fabricates sub-scores for a thin/unscored product (the "why"
-    /// section right below already covers that case in words).
-    @ViewBuilder
-    private var triMetricSectionOrNone: some View {
-        if let score = workingProduct.score, !score.factors.isEmpty {
-            TriMetricRow(factors: score.factors)
-        }
-    }
-
-    /// 5) "Why this score" — sourced, dose-aware, default-open. Falls back to
+    /// "Why this score" — sourced, dose-aware, default-open. Falls back to
     /// an honest, calm note (no fabricated breakdown) when data is too thin.
     @ViewBuilder
     private var whyScoreOrNote: some View {
@@ -418,7 +535,7 @@ struct ProductView: View {
         } else {
             CollapsibleSection {
                 Text("Why this score")
-                    .font(.title3.weight(.semibold))
+                    .font(DisplayType.h3)
                     .foregroundStyle(Theme.textPrimary)
             } content: {
                 Text("We don't have enough data yet to break this product down. Once more details come in, you'll see the full processing, nutrition, and additive breakdown here.")
@@ -436,7 +553,7 @@ struct ProductView: View {
         CollapsibleSection(cardStyle: false) {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
                 Text("What's inside")
-                    .font(.title3.weight(.semibold))
+                    .font(DisplayType.h3)
                     .foregroundStyle(Theme.textPrimary)
                 if !displayIngredients.isEmpty {
                     Text("\(displayIngredients.count)")
@@ -475,7 +592,7 @@ struct ProductView: View {
         if !workingProduct.allergens.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Space.s2) {
                 Text("Allergens")
-                    .font(.title3.weight(.semibold))
+                    .font(DisplayType.h3)
                     .foregroundStyle(Theme.textPrimary)
                 AllergenChipsRow(allergens: workingProduct.allergens, flaggedAllergies: flaggedAllergies)
             }

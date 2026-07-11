@@ -217,6 +217,29 @@ struct SourceChip: View {
     }
 }
 
+/// The green check "sourced from" chip — our brand mapping of Oasis's green
+/// "Oasis tested" chip. Green check + source name, on a soft green fill. It
+/// states provenance honestly (we didn't lab-test the product; the data comes
+/// from an open, cited source), which is the transparency wedge (principle #1).
+struct SourcedChip: View {
+    var name: String = "Open Food Facts"
+
+    var body: some View {
+        Label {
+            Text(name)
+        } icon: {
+            Image(systemName: "checkmark.seal.fill")
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(Theme.greenDeep)
+        .padding(.horizontal, Theme.Space.s3)
+        .padding(.vertical, Theme.Space.s1)
+        .background(Capsule().fill(Theme.greenSoft))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Sourced from \(name)")
+    }
+}
+
 // MARK: - Tri-metric row (§5.2 — the key steal, made more transparent)
 
 /// Three equal columns — Nutrition / Additives / Processing — each showing
@@ -287,7 +310,10 @@ private struct TriMetricTile: View {
                 .minimumScaleFactor(0.8)
             Text(word)
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(tint)
+                // AA fix (audit CRITICAL): the verdict WORD stays high-contrast
+                // ink; the band tint carries on the icon + bar below so the
+                // signal is still redundant (word + color) but legible.
+                .foregroundStyle(Theme.textPrimary)
             ProgressView(value: Double(factor.subScore), total: 100)
                 .tint(tint)
                 .accessibilityHidden(true)
@@ -301,6 +327,199 @@ private struct TriMetricTile: View {
         .surfaceCard(padded: false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(factor.name): \(factor.subScore) of 100, \(word)")
+    }
+}
+
+// MARK: - Hero verdict word (audit CRITICAL/HIGH — the band WORD by the ring)
+
+/// The plain-language verdict beneath the score ring — the audit's #1 Result
+/// fix (Oasis pairs "68/100" with a word; our ring showed a number + arc
+/// only). A band-tinted dot carries the color signal; the WORD itself is
+/// high-contrast ink so the verdict never rests on color alone and stays
+/// AA-legible (§7). Neutral, processing-forward wording — never "good/bad".
+struct ScoreVerdictLabel: View {
+    let band: ScoreBand
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s2) {
+            Circle().fill(band.tint).frame(width: 9, height: 9)
+            Text(band.label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Verdict: \(band.label)")
+    }
+}
+
+// MARK: - Quick-fact rows (Oasis's Beneficial / PFAS / Owned-by block)
+
+/// One at-a-glance fact row: leading SF Symbol · label · value · a band-tinted
+/// status dot (or a chevron). Maps Oasis's icon·label·value·dot rows onto our
+/// real data — no fabricated PFAS/contaminant rows. 44pt tall, calm.
+struct QuickFact: Identifiable {
+    let id = UUID()
+    let icon: String
+    let label: String
+    let value: String
+    var dotColor: Color? = nil
+    var showChevron: Bool = false
+}
+
+struct QuickFactRow: View {
+    let fact: QuickFact
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s3) {
+            Image(systemName: fact.icon)
+                .font(.body)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 26)
+                .accessibilityHidden(true)
+            Text(fact.label)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+            Spacer(minLength: Theme.Space.s2)
+            Text(fact.value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let dotColor = fact.dotColor {
+                Circle().fill(dotColor).frame(width: 9, height: 9)
+                    .accessibilityHidden(true)
+            }
+            if fact.showChevron {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(fact.label): \(fact.value)")
+    }
+}
+
+/// The grouped quick-fact block — one flat card with hairline dividers, exactly
+/// like Oasis's stacked Beneficial / Additives / … rows.
+struct QuickFactsSection: View {
+    let facts: [QuickFact]
+
+    var body: some View {
+        if !facts.isEmpty {
+            SectionCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(facts.enumerated()), id: \.element.id) { index, fact in
+                        QuickFactRow(fact: fact)
+                        if index < facts.count - 1 { HairlineDivider() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Extracts a NOVA group word ("NOVA 3") from a processing factor's detail
+/// line for the Processing quick-fact value, falling back to a short band word
+/// when the detail doesn't spell out a NOVA number. Display-only parsing — it
+/// never recomputes the score (CLAUDE.md #5).
+func processingFactValue(_ factor: ScoreFactor) -> String {
+    if let range = factor.detail.range(of: #"NOVA\s*\d"#, options: .regularExpression) {
+        return factor.detail[range].replacingOccurrences(of: "  ", with: " ")
+    }
+    switch ScoreBand.from(score: factor.subScore) {
+    case .high: return "Minimal"
+    case .mid:  return "Processed"
+    case .low:  return "Ultra-processed"
+    case .unknown: return "Unknown"
+    }
+}
+
+// MARK: - Other info (Oasis-style stat tiles)
+
+/// A single Oasis-style stat tile: a small gray label with a bold value below,
+/// on a bordered surface. Used in the "Other info" grid for product provenance
+/// (data source, confidence, last updated, barcode, score version).
+struct StatTile: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s1) {
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(Theme.textSecondary)
+            Text(value)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Space.s4)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The collapsible "Other info" section — product provenance/meta as Oasis-style
+/// tiles (a full-width lead tile + a 2-column mini-tile grid). This carries the
+/// meta Oasis puts here (Water Source / pH / TDS / Packaging); our nutrient
+/// numbers live in the sourced Watch-outs/Benefits meters above (our
+/// transparency edge) rather than being duplicated as bare tiles here.
+struct OtherInfoSection: View {
+    let product: Product
+
+    /// (label, value) provenance facts, built only from data we actually have.
+    private var tiles: [(String, String)] {
+        var out: [(String, String)] = []
+        out.append(("Data source", "Open Food Facts"))
+        let confidence = product.score?.confidence ?? product.dataConfidence
+        out.append(("Confidence", confidence.lowercased() == "high" ? "High" : "Limited"))
+        if let updated = formattedFetchedDate(product.fetchedAt) {
+            out.append(("Last updated", updated))
+        }
+        if let version = product.score?.scoreVersion, !version.isEmpty {
+            out.append(("Score version", version))
+        }
+        if let barcode = product.barcode, !barcode.isEmpty {
+            out.append(("Barcode", barcode))
+        }
+        return out
+    }
+
+    var body: some View {
+        if !tiles.isEmpty {
+            CollapsibleSection(initiallyExpanded: true, cardStyle: false) {
+                Text("Other info")
+                    .font(DisplayType.h3)
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+            } content: {
+                let lead = tiles[0]
+                let rest = Array(tiles.dropFirst())
+                VStack(spacing: Theme.Space.s3) {
+                    StatTile(label: lead.0, value: lead.1)
+                    ForEach(Array(stride(from: 0, to: rest.count, by: 2)), id: \.self) { i in
+                        HStack(spacing: Theme.Space.s3) {
+                            StatTile(label: rest[i].0, value: rest[i].1)
+                            if i + 1 < rest.count {
+                                StatTile(label: rest[i + 1].0, value: rest[i + 1].1)
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -425,7 +644,7 @@ struct WhyScoreSection: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Why this score")
-                        .font(.title3.weight(.semibold))
+                        .font(DisplayType.h3)
                         .foregroundStyle(Theme.textPrimary)
                     Text("Every factor, sourced.")
                         .font(.caption)
@@ -888,15 +1107,40 @@ struct IngredientCard: View {
             || riskTier != nil
     }
 
-    private var accentColor: Color {
-        guard hasVettedInfo else { return Theme.scoreUnknown }
+    /// Oasis maps each substance card's border + pill to its concern level
+    /// (green for the many benign ones, red for the flagged over-limit ones).
+    /// We map that onto our risk tiers using OUR calm band palette — clay, not
+    /// alarm red, for higher-concern (CLAUDE.md ED-safe rule): low → green
+    /// border, moderate → amber border, higher → clay border (+ a concern
+    /// pill). A card with no vetted data at all keeps a neutral hairline.
+    private var borderColor: Color {
+        guard hasVettedInfo else { return Theme.border }
         switch riskTier {
-        case "low": return Theme.scoreHigh
-        case "moderate": return Theme.scoreMid
-        case "higher": return Theme.scoreLow
-        default: return Theme.scoreUnknown
+        case "low": return Theme.scoreHigh.opacity(0.5)
+        case "moderate": return Theme.scoreMid.opacity(0.55)
+        case "higher": return Theme.scoreLow.opacity(0.85)
+        default: return Theme.border
         }
     }
+
+    private var borderWidth: CGFloat { riskTier == "higher" ? 1.5 : 1 }
+
+    /// The Oasis-style concern pill in the card's top-right corner — shown only
+    /// for the "to know about" tiers, so the many benign ingredients stay clean
+    /// (matching Oasis, where most cards carry no pill). We have no numeric
+    /// dose/limit data, so it's an honest severity WORD ("Higher concern"),
+    /// never a fabricated "33x limit".
+    private var concernPill: (text: String, color: Color, filled: Bool)? {
+        switch riskTier {
+        case "moderate": return ("Moderate concern", Theme.scoreMid, false)
+        case "higher":   return ("Higher concern", Theme.scoreLow, true)
+        default:         return nil
+        }
+    }
+
+    /// The Oasis meta line under the name (e.g. "E322 · emulsifier"). We use the
+    /// additive INS-class category when present; plain food tokens have none.
+    private var metaLine: String? { ingredient.category }
 
     private var hasExpandableDetail: Bool {
         (ingredient.whyUsed?.isEmpty == false)
@@ -908,60 +1152,86 @@ struct IngredientCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.Space.s3) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(accentColor)
-                .frame(width: 4)
-
-            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+        VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            // Name (bold) + optional concern pill top-right — the Oasis card head.
+            HStack(alignment: .top, spacing: Theme.Space.s2) {
                 Text(ingredient.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.callout.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
-
-                if let matchedFlaggedAllergy {
-                    Text("You asked to avoid \(AllergenMatch.displayName(matchedFlaggedAllergy)).")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let pill = concernPill {
+                    concernPillView(pill)
                 }
+            }
 
-                if hasVettedInfo {
-                    if let what = ingredient.what, !what.isEmpty {
-                        Text(what)
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            // Meta line under the name (category / E-class), Oasis-style gray.
+            if let metaLine {
+                Text(metaLine)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+            }
 
-                    if isExpanded {
-                        expandedDetail
-                    }
+            if let matchedFlaggedAllergy {
+                Text("You asked to avoid \(AllergenMatch.displayName(matchedFlaggedAllergy)).")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Theme.textSecondary)
+            }
 
-                    if hasExpandableDetail {
-                        Button(isExpanded ? "Show less" : "Read more") {
-                            withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
-                                isExpanded.toggle()
-                            }
-                        }
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.greenDeep)
-                        .padding(.vertical, Theme.Space.s1)
-                        .contentShape(Rectangle())
-                    }
-                } else {
-                    Text("We don't have vetted info on this ingredient yet.")
+            if hasVettedInfo {
+                if let what = ingredient.what, !what.isEmpty {
+                    Text(what)
                         .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                if isExpanded {
+                    expandedDetail
+                }
+
+                if hasExpandableDetail {
+                    Button(isExpanded ? "Show less" : "Read more") {
+                        withAnimation(Motion.respecting(Motion.standard, reduceMotion)) {
+                            isExpanded.toggle()
+                        }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .padding(.vertical, Theme.Space.s1)
+                    .contentShape(Rectangle())
+                }
+            } else {
+                Text("We don't have vetted info on this ingredient yet.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(Theme.Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Space.s4)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .strokeBorder(Theme.border, lineWidth: 1)
+                .strokeBorder(borderColor, lineWidth: borderWidth)
         )
         .accessibilityElement(children: .combine)
+    }
+
+    private func concernPillView(_ pill: (text: String, color: Color, filled: Bool)) -> some View {
+        Text(pill.text)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(pill.filled ? Color.white : pill.color)
+            .padding(.horizontal, Theme.Space.s3)
+            .padding(.vertical, 5)
+            .background(
+                Capsule().fill(pill.filled ? pill.color : pill.color.opacity(0.12))
+            )
+            .overlay(
+                Capsule().strokeBorder(pill.color.opacity(pill.filled ? 0 : 0.5), lineWidth: 1)
+            )
+            .fixedSize()
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -1205,9 +1475,13 @@ struct MeterRowView: View {
                     ProgressView(value: fraction, total: 1)
                         .tint(tint)
                         .accessibilityHidden(true)
-                    Text(row.tier)
+                    // AA fix (audit): capitalize for rendering only (matches the
+                    // tri-metric word casing) and keep the word in legible ink —
+                    // the tint lives on the bar above. The raw `row.tier` is
+                    // still used verbatim in the accessibilityLabel below.
+                    Text(row.tier.capitalized)
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(Theme.textPrimary)
                 }
                 .contentShape(Rectangle())
             }
@@ -1237,7 +1511,7 @@ struct MetersSection: View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Space.s3) {
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font(DisplayType.h3)
                     .foregroundStyle(Theme.textPrimary)
                 VStack(spacing: Theme.Space.s3) {
                     ForEach(rows) { MeterRowView(row: $0, maxScale: maxScale) }
@@ -1475,7 +1749,7 @@ struct SourcesSection: View {
         CollapsibleSection(initiallyExpanded: false, cardStyle: false) {
             HStack {
                 Text("Sources")
-                    .font(.title3.weight(.semibold))
+                    .font(DisplayType.h3)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: Theme.Space.s2)
                 Text("\(sources.count)")

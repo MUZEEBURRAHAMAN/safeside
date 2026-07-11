@@ -88,6 +88,19 @@ extension Product {
                 category: "Flavour enhancers"
             ),
             Ingredient(
+                name: "Sulphite ammonia caramel",
+                what: "A caramel colour (E150d) made with ammonium and sulphite compounds.",
+                whyUsed: "Gives cola and snack coatings their brown colour.",
+                safety: "An ADI is set; some processing by-products are under ongoing review.",
+                riskTier: "higher",
+                whoShouldAvoid: ["people advised to limit sulphites"],
+                misconceptions: [],
+                foundIn: ["colas", "sauces", "savoury snacks"],
+                sources: [Source(name: "EFSA re-evaluation of caramel colours, 2011", url: "https://www.efsa.europa.eu/")],
+                confidence: "high",
+                category: "Colours"
+            ),
+            Ingredient(
                 name: "Natural flavouring",
                 what: nil, whyUsed: nil, safety: nil, riskTier: nil,
                 whoShouldAvoid: [], misconceptions: [], foundIn: [],

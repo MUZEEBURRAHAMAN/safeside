@@ -39,6 +39,11 @@ enum DisplayType {
     static let h1 = Font.display(26, weight: .bold, relativeTo: .title)
     /// Prominent section header where we want brand character.
     static let h2 = Font.display(20, weight: .semibold, relativeTo: .title2)
+    /// Standard result-screen section header ("What's inside", "Sources", …).
+    /// DESIGN_SYSTEM_V3 §3/§8.2: Space Grotesk on every section headline (the
+    /// brand's typographic signature — fixes the audit "generic SF Pro heading
+    /// layer" finding). Sits between h2 and body in the ramp.
+    static let h3 = Font.display(18, weight: .semibold, relativeTo: .title3)
 }
 
 // MARK: - Motion
