@@ -430,7 +430,7 @@ private struct HowItWorksSlide: Identifiable {
 private struct HowItWorksCarousel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var page = 0
-    @ScaledMetric(relativeTo: .body) private var cardHeight: CGFloat = 168
+    @ScaledMetric(relativeTo: .body) private var cardHeight: CGFloat = 184
 
     // A slow, calm auto-advance — gated on Reduce Motion inside `onReceive`.
     private let autoAdvance = Timer.publish(every: 7, on: .main, in: .common).autoconnect()
@@ -462,7 +462,10 @@ private struct HowItWorksCarousel: View {
         VStack(spacing: Theme.Space.s3) {
             TabView(selection: $page) {
                 ForEach(slides) { slide in
+                    // Inset each page vertically so the green card's rounded top/
+                    // bottom edges don't clip against the paged TabView's bounds.
                     HowItWorksCardView(slide: slide)
+                        .padding(.vertical, 6)
                         .tag(slide.id)
                 }
             }

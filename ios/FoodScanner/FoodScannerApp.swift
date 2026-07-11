@@ -17,6 +17,9 @@ struct FoodScannerApp: App {
     // from UserDefaults so a fresh install (and only a fresh install) sees it.
     @State private var showOnboarding: Bool
 
+    // Brief branded cold-launch splash (SplashView), cross-faded away after ~1.4s.
+    @State private var showSplash = true
+
     init() {
         let session = SessionService()
         _session = State(initialValue: session)
@@ -60,6 +63,8 @@ struct FoodScannerApp: App {
                         CategoryDetailView(category: FoodCategory.all[0])
                     }
                 }
+            } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "splash" {
+                harness { SplashView() }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "home" {
                 harness { NavigationStack { HomeView() } }
             } else if ProcessInfo.processInfo.environment["SHOW_SCREEN"] == "search" {
@@ -124,6 +129,7 @@ struct FoodScannerApp: App {
 #endif
 
     private var appBody: some View {
+        ZStack {
             RootTabView()
                 .environment(session)
                 .environment(pantryService)
@@ -139,6 +145,15 @@ struct FoodScannerApp: App {
                     }
                     .environment(profileService)
                 }
+
+            if showSplash {
+                SplashView().transition(.opacity)
+            }
+        }
+        .task {
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
+        }
     }
 }
 
