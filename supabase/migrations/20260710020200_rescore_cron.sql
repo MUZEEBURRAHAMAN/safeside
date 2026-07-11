@@ -7,15 +7,15 @@
 -- read from a DB setting so the literal is NEVER committed to the repo.
 --
 -- SECRET WIRING (run once, OUT OF BAND — do NOT commit the literal):
---   -- Option A (DB setting; survives restarts on Supabase):
---   alter database postgres set app.rescore_secret = '<the-secret>';
---   -- Option B (Supabase Vault): store in vault and read via
---   --   vault.decrypted_secrets in a SECURITY DEFINER wrapper.
--- The same value must be set as the function secret:
---   supabase secrets set RESCORE_SECRET='<the-secret>' --project-ref <ref>
+--   NOTE: `alter database postgres set app.rescore_secret = …` is REJECTED on
+--   managed Supabase (ERROR 42501 — even the dashboard `postgres` role cannot
+--   set a custom `app.*` GUC). Use Supabase Vault instead:
+--     select vault.create_secret('<the-secret>', 'rescore_secret');
+--   The same value must be set as the function secret:
+--     supabase secrets set RESCORE_SECRET='<the-secret>' --project-ref <ref>
 --
--- If `app.rescore_secret` is unset, current_setting(..., true) returns NULL and
--- the function returns 401 — a safe no-op until the secret is wired.
+-- If the vault secret is missing, the subquery returns NULL and the function
+-- returns 401 — a safe no-op until the secret is wired.
 -- =============================================================================
 
 create extension if not exists pg_cron;
@@ -31,7 +31,7 @@ select cron.schedule(
     url := 'https://usmdthxnxzdywtjgbokl.functions.supabase.co/rescore',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'X-Rescore-Secret', current_setting('app.rescore_secret', true)
+      'X-Rescore-Secret', (select decrypted_secret from vault.decrypted_secrets where name = 'rescore_secret')
     ),
     body := jsonb_build_object('limit', 200)
   );
